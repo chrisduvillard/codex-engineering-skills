@@ -42,6 +42,8 @@ Each skill is deliberately opinionated. Together they cover eleven recurring fai
 
 ### 01 · Deep Plan
 
+![Deep Plan turns a vague request into investigated, risk-ordered, ready-to-run tasks.](assets/skills/deep-plan.jpg)
+
 Turns a rough engineering request into a plan that can survive fresh sessions and shallow review. It investigates the real repository first, sizes the work, exposes ambiguity, orders phases by risk, and produces self-contained sub-prompts with exact verification and stop conditions.
 
 > **Use it when:** the request spans several files, hides product decisions, or could easily become an unreviewable diff.
@@ -51,6 +53,8 @@ Use $deep-plan to investigate this repository and turn the request into a risk-o
 ```
 
 ### 02 · Brownfield Steward
+
+![Brownfield Steward verifies and selectively refreshes knowledge of an existing system into a durable world model.](assets/skills/steward-brownfield.jpg)
 
 Treats project knowledge as durable infrastructure. It initializes or resumes a versioned world model, refreshes only affected knowledge, coordinates bounded specialist work, and checkpoints evidence so the next agent does not have to rediscover the system from scratch.
 
@@ -62,6 +66,8 @@ Use $steward-brownfield to resume this project safely and recommend the next hig
 
 ### 03 · Harvest Agent Branches
 
+![Harvest Agent Branches compares divergent branches and transfers only safe, coherent slices onto current main.](assets/skills/harvest-agent-branches.jpg)
+
 Recovers intent from abandoned or divergent agent work without assuming the whole branch deserves to land. It pins source and target evidence, builds a path matrix, decomposes work by behavior, chooses the least risky transfer method, and preserves recovery before cleanup.
 
 > **Use it when:** an old branch contains valuable work, but `merge` is too blunt an instrument.
@@ -71,6 +77,8 @@ Use $harvest-agent-branches to salvage coherent work from this branch onto curre
 ```
 
 ### 04 · Trace Data Provenance
+
+![Trace Data Provenance follows one value across every boundary and identifies its first unsafe semantic change.](assets/skills/trace-data-provenance.jpg)
 
 Follows a concrete datum from authoritative input to delivered output. It checks identity, time semantics, units, missingness, fallbacks, lineage, and historical behavior—then identifies the earliest boundary where meaning becomes unproven or incorrect.
 
@@ -82,6 +90,8 @@ Use $trace-data-provenance to trace this value end to end and identify the first
 
 ### 05 · Adversarial Review
 
+![Adversarial Review attacks a seemingly correct change and turns a discovered weakness into a minimal reproduction and bounded residual risk.](assets/skills/adversarial-review.jpg)
+
 Attempts to falsify behavioral and security correctness rather than merely confirming the happy path. It derives an attack ledger from actual contracts and code, selects adaptive techniques, minimizes reproductions, and reports bounded residual risk instead of vague reassurance.
 
 > **Use it when:** a parser, workflow, API, or bug fix needs more than an ordinary code review.
@@ -91,6 +101,8 @@ Use $adversarial-review to attack this change with adaptive edge-case tests.
 ```
 
 ### 06 · Reasoning Codebase Review
+
+![Reasoning Codebase Review sends independent reasoning agents through one codebase, then uses red and blue challenge to judge their findings.](assets/skills/reasoning-codebase-review.jpg)
 
 Orchestrates independent reviewers through pre-mortem, first-principles, inversion, Socratic, constraint, stakeholder, and analogical lenses. It then subjects normalized claims to separate red and blue challengers before the coordinator accepts, qualifies, or rejects them.
 
@@ -102,6 +114,8 @@ Use $reasoning-codebase-review to pressure-test this codebase through independen
 
 ### 07 · Decision Recon
 
+![Decision Recon filters engineering options through hard gates and current evidence before making a reversible recommendation.](assets/skills/decision-recon.jpg)
+
 Turns technology, vendor, architecture, migration, and build-versus-buy choices into evidence-backed decisions. It frames hard gates before researching candidates, tracks claim freshness, exposes lock-in and lifecycle cost, tests sensitivity, and challenges the provisional leader before recommending it.
 
 > **Use it when:** the expensive part is choosing—and being able to explain when that choice should change.
@@ -111,6 +125,8 @@ Use $decision-recon to compare these options and produce a reversible, evidence-
 ```
 
 ### 08 · Evidence Retrospective
+
+![Evidence Retrospective reconstructs completed work from repository artifacts and produces sourced, owned follow-ups.](assets/skills/evidence-retrospective.jpg)
 
 Reconstructs a release, milestone, sprint, migration, or multi-session feature from the evidence it left behind. It analyzes the whole change for architecture drift, integration seams, duplicated patterns, verification gaps, and follow-through—while keeping missing evidence distinct from missing work.
 
@@ -122,6 +138,8 @@ Use $evidence-retrospective to review this milestone and propose sourced, owned 
 
 ### 09 · Checkpoint Walkthrough
 
+![Checkpoint Walkthrough orients a code change, guides concern-grouped review stops, and prepares a bounded human decision.](assets/skills/checkpoint-walkthrough.jpg)
+
 Guides a human from intent and surface-area orientation through a concern-grouped code trail, high-blast-radius questions, and safe ways to observe behavior. It keeps risk prompts separate from verified defects and ends with an explicitly bounded Approve, Rework, or Discuss decision.
 
 > **Use it when:** a diff needs to become understandable before it can become acceptable.
@@ -132,6 +150,8 @@ Use $checkpoint-walkthrough to show me what changed, where to look, and what rem
 
 ### 10 · Idea Forge
 
+![Idea Forge exposes an early idea's assumptions, alternates attack and defense, and uses cheap experiments to reach an honest outcome.](assets/skills/idea-forge.jpg)
+
 Pressure-tests a product, feature, architecture, workflow, or business concept before planning momentum makes it expensive to question. It separates actors and incentives, alternates attack with strongest-case defense, identifies discriminating experiments, and closes as Hardened, Clarified, Parked, or Killed.
 
 > **Use it when:** the cheapest useful deliverable may be a better idea—or permission to drop it.
@@ -141,6 +161,8 @@ Use $idea-forge to attack this idea, defend what survives, and render an honest 
 ```
 
 ### 11 · Context Pruner
+
+![Context Pruner maps what agents load, verifies every rule, and produces compact instructions backed by mechanical enforcement.](assets/skills/context-pruner.jpg)
 
 Treats always-loaded agent instructions as scarce infrastructure. It maps what each harness actually loads, verifies rules against the repository, tracks every instruction through a change ledger, prefers mechanical enforcement, and removes human-authored guidance only when evidence or explicit approval supports it.
 
@@ -187,6 +209,9 @@ The eleven skills are different tools, but they enforce the same engineering ins
 ## Repository layout
 
 ```text
+assets/
+└── skills/
+    └── eleven README workflow illustrations
 skills/
 ├── deep-plan/
 ├── steward-brownfield/
