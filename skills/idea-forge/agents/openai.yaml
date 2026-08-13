@@ -1,0 +1,4 @@
+interface:
+  display_name: "Idea Forge"
+  short_description: "Pressure-test ideas before commitment gets expensive"
+  default_prompt: "Use $idea-forge to challenge this idea, strengthen what survives, and tell me whether to harden, clarify, park, or kill it."

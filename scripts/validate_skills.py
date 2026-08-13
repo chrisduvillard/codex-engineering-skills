@@ -23,6 +23,7 @@ EXPECTED_SKILLS = {
     "deep-plan",
     "evidence-retrospective",
     "harvest-agent-branches",
+    "idea-forge",
     "reasoning-codebase-review",
     "steward-brownfield",
     "trace-data-provenance",
