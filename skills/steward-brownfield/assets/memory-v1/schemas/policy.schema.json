@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://codex.local/steward-brownfield/policy.schema.json",
+  "title": "Brownfield Steward Policy",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "canonical_writer",
+    "default_mode",
+    "memory_writes_in_read_only_modes",
+    "source_writes_require_explicit_authority",
+    "max_record_bytes",
+    "default_context_max_chars",
+    "retention",
+    "forbidden_persistence",
+    "approval_gates"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "canonical_writer": { "const": "SINGLE_COORDINATOR" },
+    "default_mode": {
+      "enum": [
+        "DISCOVERY",
+        "AUDIT",
+        "PLAN",
+        "CONSERVATIVE_FIX",
+        "IMPROVE",
+        "VISION_ALIGNMENT",
+        "BOUNDED_AUTONOMOUS"
+      ]
+    },
+    "memory_writes_in_read_only_modes": { "type": "boolean" },
+    "source_writes_require_explicit_authority": { "const": true },
+    "max_record_bytes": { "type": "integer", "minimum": 1024, "maximum": 100000000 },
+    "default_context_max_chars": { "type": "integer", "minimum": 2000, "maximum": 1000000 },
+    "retention": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "raw_agent_output",
+        "command_logs",
+        "meaningful_user_qa",
+        "closed_run_details"
+      ],
+      "properties": {
+        "raw_agent_output": { "const": "DO_NOT_PERSIST" },
+        "command_logs": { "const": "SUMMARY_AND_DIGEST_ONLY" },
+        "meaningful_user_qa": { "const": "SANITIZED_DURABLE" },
+        "closed_run_details": { "const": "COMPACT_AFTER_RECOVERY_WINDOW" }
+      }
+    },
+    "forbidden_persistence": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1, "maxLength": 200 }
+    },
+    "approval_gates": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1, "maxLength": 200 }
+    }
+  }
+}

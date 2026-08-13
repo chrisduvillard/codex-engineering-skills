@@ -1,0 +1,4 @@
+interface:
+  display_name: "Harvest Agent Branches"
+  short_description: "Safely salvage work from divergent agent branches"
+  default_prompt: "Use $harvest-agent-branches to salvage coherent work from this stale branch onto current main without overwriting newer changes."

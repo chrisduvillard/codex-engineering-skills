@@ -1,0 +1,4 @@
+interface:
+  display_name: "Trace Data Provenance"
+  short_description: "Trace data from source to delivered output"
+  default_prompt: "Use $trace-data-provenance to trace this value end to end and identify any unproven or unsafe boundary."

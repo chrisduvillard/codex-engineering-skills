@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:steward-brownfield:memory-v1:manifest",
+  "title": "Brownfield project-memory manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "minimum_writer_version",
+    "project_id",
+    "project_name",
+    "created_at",
+    "canonical_branch",
+    "repositories",
+    "native_authorities",
+    "schema_directory"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "minimum_writer_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$"
+    },
+    "project_id": { "$ref": "#/$defs/uuid" },
+    "project_name": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "created_at": { "$ref": "#/$defs/timestamp" },
+    "canonical_branch": { "type": "string", "minLength": 1, "maxLength": 255 },
+    "repositories": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/repository" }
+    },
+    "native_authorities": {
+      "description": "Project-native instructions and decision sources to cite rather than duplicate.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/native_authority" }
+    },
+    "schema_directory": { "const": "schemas" }
+  },
+  "$defs": {
+    "uuid": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+    },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "logical_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+      "maxLength": 128
+    },
+    "relative_path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\\\]+$"
+    },
+    "sanitized_remote": {
+      "description": "Remote alias after removal of embedded credentials; never use it as project identity alone.",
+      "oneOf": [
+        {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512,
+          "not": { "pattern": "://[^/@\\s]+:[^@\\s]+@" }
+        },
+        { "type": "null" }
+      ]
+    },
+    "repository": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "repository_uuid", "path", "role", "authority_branch", "remote_alias"],
+      "properties": {
+        "id": { "$ref": "#/$defs/logical_id" },
+        "repository_uuid": { "$ref": "#/$defs/uuid" },
+        "path": { "$ref": "#/$defs/relative_path" },
+        "role": { "enum": ["COORDINATING", "SOURCE", "AUXILIARY"] },
+        "authority_branch": { "type": "string", "minLength": 1, "maxLength": 255 },
+        "remote_alias": { "$ref": "#/$defs/sanitized_remote" }
+      }
+    },
+    "native_authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "repository_id", "path", "scope"],
+      "properties": {
+        "id": { "$ref": "#/$defs/logical_id" },
+        "kind": {
+          "enum": ["REPOSITORY_INSTRUCTIONS", "GLOSSARY", "ADR", "ARCHITECTURE", "PRODUCT", "POLICY", "OTHER"]
+        },
+        "repository_id": { "$ref": "#/$defs/logical_id" },
+        "path": { "$ref": "#/$defs/relative_path" },
+        "scope": { "type": "string", "minLength": 1, "maxLength": 1000 }
+      }
+    }
+  }
+}

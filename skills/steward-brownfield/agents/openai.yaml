@@ -1,0 +1,4 @@
+interface:
+  display_name: "Brownfield Steward"
+  short_description: "Persist and improve evolving codebases"
+  default_prompt: "Use $steward-brownfield to resume this project safely, refresh its persistent model, and recommend the next highest-value step."

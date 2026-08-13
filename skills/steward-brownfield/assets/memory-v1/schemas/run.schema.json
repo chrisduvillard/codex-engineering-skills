@@ -1,0 +1,248 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:steward-brownfield:memory-v1:run",
+  "title": "Brownfield run state",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "status",
+    "stage",
+    "mode",
+    "objective",
+    "scope",
+    "coordinator",
+    "created_at",
+    "updated_at",
+    "base_memory_revision",
+    "base_knowledge_digest",
+    "baseline",
+    "envelope",
+    "checkpoints",
+    "final_snapshot"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "run_id": { "$ref": "#/$defs/id" },
+    "status": { "enum": ["ACTIVE", "BLOCKED", "INTERRUPTED", "COMPLETE", "ABORTED"] },
+    "stage": {
+      "enum": ["INITIALIZED", "INVESTIGATING", "CHANGING", "VALIDATING", "REVIEWING", "MERGING", "COMPLETE"]
+    },
+    "mode": {
+      "enum": [
+        "DISCOVERY",
+        "AUDIT",
+        "PLAN",
+        "CONSERVATIVE_FIX",
+        "IMPROVE",
+        "VISION_ALIGNMENT",
+        "BOUNDED_AUTONOMOUS"
+      ]
+    },
+    "objective": { "type": "string", "minLength": 1, "maxLength": 5000 },
+    "scope": { "type": "string", "minLength": 1, "maxLength": 5000 },
+    "coordinator": { "$ref": "#/$defs/actor" },
+    "created_at": { "$ref": "#/$defs/timestamp" },
+    "updated_at": { "$ref": "#/$defs/timestamp" },
+    "completed_at": { "$ref": "#/$defs/timestamp" },
+    "base_memory_revision": { "type": "integer", "minimum": 0 },
+    "base_knowledge_digest": {
+      "description": "Compare-and-swap digest of canonical knowledge at run start.",
+      "$ref": "#/$defs/sha256"
+    },
+    "baseline": { "$ref": "#/$defs/baseline" },
+    "envelope": { "$ref": "#/$defs/envelope" },
+    "checkpoints": { "type": "array", "items": { "$ref": "#/$defs/checkpoint" } },
+    "final_snapshot": {
+      "oneOf": [
+        { "$ref": "#/$defs/source_snapshot" },
+        { "type": "null" }
+      ]
+    },
+    "final_memory_revision": { "type": "integer", "minimum": 0 }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "mode": { "enum": ["DISCOVERY", "AUDIT", "PLAN"] } },
+        "required": ["mode"]
+      },
+      "then": {
+        "properties": {
+          "envelope": {
+            "properties": { "source_writes_authorized": { "const": false } }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "status": { "const": "COMPLETE" } }, "required": ["status"] },
+      "then": { "required": ["completed_at", "final_memory_revision"] }
+    },
+    {
+      "if": { "properties": { "status": { "const": "ABORTED" } }, "required": ["status"] },
+      "then": {
+        "required": ["completed_at", "final_memory_revision"],
+        "properties": {
+          "stage": {
+            "enum": ["INITIALIZED", "INVESTIGATING", "CHANGING", "VALIDATING", "REVIEWING", "MERGING"]
+          },
+          "final_snapshot": { "type": "null" }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+      "maxLength": 128
+    },
+    "actor": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+      "maxLength": 128
+    },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "relative_path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\\\]+$"
+    },
+    "repository_snapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository_id", "status", "source_digest", "dirty_paths"],
+      "properties": {
+        "repository_id": { "$ref": "#/$defs/actor" },
+        "status": { "enum": ["CLEAN", "DIRTY", "MISSING", "UNVERSIONED"] },
+        "branch": { "type": "string", "minLength": 1, "maxLength": 255 },
+        "commit": {
+          "oneOf": [
+            { "type": "string", "pattern": "^[a-f0-9]{7,64}$" },
+            { "type": "null" }
+          ]
+        },
+        "source_tree_sha256": { "$ref": "#/$defs/sha256" },
+        "working_tree_sha256": { "$ref": "#/$defs/sha256" },
+        "source_digest": {
+          "oneOf": [
+            { "$ref": "#/$defs/sha256" },
+            { "type": "null" }
+          ]
+        },
+        "dirty_paths": { "type": "array", "items": { "$ref": "#/$defs/relative_path" } },
+        "dirty_path_sha256": {
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/relative_path" },
+          "additionalProperties": {
+            "type": "string",
+            "pattern": "^(?:[a-f0-9]{64}|MISSING)$"
+          }
+        },
+        "remote_alias": {
+          "oneOf": [
+            { "type": "string", "minLength": 1, "maxLength": 512 },
+            { "type": "null" }
+          ]
+        }
+      }
+    },
+    "source_snapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repositories", "vector_digest", "source_vector_digest"],
+      "properties": {
+        "repositories": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/repository_snapshot" } },
+        "vector_digest": { "$ref": "#/$defs/sha256" },
+        "source_vector_digest": {
+          "description": "Content-only digest that excludes memory-only commit movement.",
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "check_summary": {
+      "oneOf": [
+        { "type": "string", "minLength": 1, "maxLength": 2000 },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "result", "summary", "output_digest", "redaction_status"],
+          "properties": {
+            "kind": { "type": "string", "minLength": 1, "maxLength": 128 },
+            "sanitized_command": { "type": "string", "minLength": 1, "maxLength": 2000 },
+            "result": { "enum": ["PASS", "FAIL", "SKIPPED", "INCONCLUSIVE", "STALE"] },
+            "summary": { "type": "string", "maxLength": 2000 },
+            "output_digest": {
+              "oneOf": [
+                { "$ref": "#/$defs/sha256" },
+                { "type": "null" }
+              ]
+            },
+            "redaction_status": { "enum": ["NOT_APPLICABLE", "REVIEWED", "REDACTED"] }
+          }
+        }
+      ]
+    },
+    "baseline": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_snapshot", "known_checks"],
+      "properties": {
+        "source_snapshot": { "$ref": "#/$defs/source_snapshot" },
+        "known_checks": { "type": "array", "items": { "$ref": "#/$defs/check_summary" } }
+      }
+    },
+    "envelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_writes_authorized",
+        "allowed_paths",
+        "forbidden_paths",
+        "risk_ceiling",
+        "max_tasks",
+        "max_agents",
+        "required_checks",
+        "stopping_conditions"
+      ],
+      "properties": {
+        "source_writes_authorized": { "type": "boolean" },
+        "allowed_paths": { "type": "array", "items": { "$ref": "#/$defs/relative_path" } },
+        "forbidden_paths": { "type": "array", "items": { "$ref": "#/$defs/relative_path" } },
+        "risk_ceiling": { "enum": ["LOW", "MODERATE", "HIGH"] },
+        "max_tasks": { "type": "integer", "minimum": 1 },
+        "max_agents": { "type": "integer", "minimum": 1 },
+        "required_checks": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 1000 }
+        },
+        "stopping_conditions": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1, "maxLength": 1000 }
+        }
+      }
+    },
+    "checkpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["at", "stage", "summary", "checks", "source_snapshot", "memory_revision"],
+      "properties": {
+        "at": { "$ref": "#/$defs/timestamp" },
+        "stage": { "enum": ["INVESTIGATING", "CHANGING", "VALIDATING", "REVIEWING", "MERGING"] },
+        "summary": { "type": "string", "minLength": 1, "maxLength": 4000 },
+        "checks": {
+          "description": "Sanitized check labels or summaries only; never raw command output.",
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 2000 }
+        },
+        "source_snapshot": { "$ref": "#/$defs/source_snapshot" },
+        "memory_revision": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

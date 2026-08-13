@@ -1,0 +1,436 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:steward-brownfield:memory-v1:record",
+  "title": "Brownfield canonical record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "id",
+    "record_type",
+    "record_revision",
+    "classification",
+    "title",
+    "statement",
+    "knowledge_status",
+    "workflow_status",
+    "confidence",
+    "scope",
+    "sensitivity",
+    "evidence",
+    "depends_on",
+    "supersedes",
+    "related_records",
+    "freshness_policy",
+    "verification",
+    "details",
+    "created_at",
+    "updated_at",
+    "created_by",
+    "origin_run",
+    "history"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "id": { "$ref": "#/$defs/id" },
+    "record_type": {
+      "enum": [
+        "claim",
+        "requirement",
+        "decision",
+        "question",
+        "contradiction",
+        "finding",
+        "investigation",
+        "task",
+        "user-event",
+        "migration"
+      ]
+    },
+    "record_revision": { "type": "integer", "minimum": 1 },
+    "classification": {
+      "enum": [
+        "FACT",
+        "USER_REQUIREMENT",
+        "USER_ASSERTION",
+        "DECISION",
+        "INFERENCE",
+        "ASSUMPTION",
+        "HYPOTHESIS",
+        "UNKNOWN"
+      ]
+    },
+    "title": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "statement": { "type": "string", "minLength": 1, "maxLength": 5000 },
+    "knowledge_status": {
+      "enum": ["CURRENT", "STALE", "INVALIDATED", "UNCERTAIN", "HISTORICAL"]
+    },
+    "workflow_status": { "$ref": "#/$defs/workflow_status" },
+    "confidence": { "enum": ["HIGH", "MEDIUM", "LOW", "UNKNOWN"] },
+    "scope": { "$ref": "#/$defs/scope" },
+    "sensitivity": { "enum": ["PUBLIC", "INTERNAL", "RESTRICTED_REFERENCE_ONLY"] },
+    "evidence": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/evidence" }
+    },
+    "depends_on": { "$ref": "#/$defs/dependencies" },
+    "supersedes": { "type": "array", "items": { "$ref": "#/$defs/id" } },
+    "related_records": { "type": "array", "items": { "$ref": "#/$defs/id" } },
+    "freshness_policy": { "$ref": "#/$defs/freshness_policy" },
+    "verification": { "$ref": "#/$defs/verification" },
+    "details": {
+      "description": "Type-specific structured data. Store concise conclusions, never secrets, chain-of-thought, raw logs, or production records.",
+      "type": "object",
+      "maxProperties": 100
+    },
+    "created_at": { "$ref": "#/$defs/timestamp" },
+    "updated_at": { "$ref": "#/$defs/timestamp" },
+    "created_by": { "$ref": "#/$defs/actor" },
+    "origin_run": { "$ref": "#/$defs/id" },
+    "history": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/history_entry" }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "classification": { "const": "FACT" },
+          "confidence": { "const": "HIGH" }
+        },
+        "required": ["classification", "confidence"]
+      },
+      "then": {
+        "properties": {
+          "evidence": {
+            "minItems": 1,
+            "contains": {
+              "properties": {
+                "kind": { "enum": ["CODE", "TEST", "RUNTIME", "USER_EVENT", "DECISION", "EXTERNAL"] }
+              },
+              "required": ["kind"]
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "classification": { "const": "USER_REQUIREMENT" } },
+        "required": ["classification"]
+      },
+      "then": {
+        "properties": {
+          "evidence": {
+            "contains": {
+              "properties": { "kind": { "const": "USER_EVENT" } },
+              "required": ["kind"]
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "record_type": { "const": "requirement" } },
+        "required": ["record_type"]
+      },
+      "then": { "properties": { "classification": { "const": "USER_REQUIREMENT" } } }
+    },
+    {
+      "if": {
+        "properties": { "record_type": { "const": "decision" } },
+        "required": ["record_type"]
+      },
+      "then": { "properties": { "classification": { "const": "DECISION" } } }
+    }
+  ],
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+      "maxLength": 128
+    },
+    "actor": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+      "maxLength": 128
+    },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "relative_path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\\\]+$"
+    },
+    "workflow_status": {
+      "enum": [
+        "DRAFT",
+        "OPEN",
+        "BLOCKING",
+        "HIGH_VALUE",
+        "PROPOSED",
+        "DISCOVERED",
+        "QUEUED",
+        "BLOCKED",
+        "INVESTIGATING",
+        "VALIDATING",
+        "CONFIRMED",
+        "REJECTED",
+        "DEFERRED",
+        "PLANNED",
+        "IMPLEMENTING",
+        "VERIFYING",
+        "RESOLVED",
+        "ACCEPTED",
+        "ANSWERED",
+        "SUPERSEDED",
+        "NO_CHANGE_REQUIRED"
+      ]
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repositories", "components", "environment", "phase"],
+      "properties": {
+        "repositories": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/actor" }
+        },
+        "components": { "type": "array", "items": { "$ref": "#/$defs/id" } },
+        "environment": {
+          "oneOf": [
+            { "type": "string", "minLength": 1, "maxLength": 128 },
+            { "type": "null" }
+          ]
+        },
+        "phase": {
+          "oneOf": [
+            { "type": "string", "minLength": 1, "maxLength": 128 },
+            { "type": "null" }
+          ]
+        }
+      }
+    },
+    "source_locator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repo"],
+      "properties": {
+        "repo": { "$ref": "#/$defs/actor" },
+        "path": { "$ref": "#/$defs/relative_path" },
+        "glob": { "$ref": "#/$defs/relative_path" },
+        "symbol": { "type": "string", "minLength": 1, "maxLength": 500 },
+        "line_hint": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 2,
+          "items": { "type": "integer", "minimum": 1 }
+        },
+        "revision": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "content_sha256": { "$ref": "#/$defs/sha256" }
+      },
+      "oneOf": [
+        { "required": ["path"] },
+        { "required": ["glob"] }
+      ]
+    },
+    "source_selector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repo"],
+      "properties": {
+        "selector_id": { "$ref": "#/$defs/id" },
+        "repo": { "$ref": "#/$defs/actor" },
+        "path": { "$ref": "#/$defs/relative_path" },
+        "glob": { "$ref": "#/$defs/relative_path" },
+        "symbol": { "type": "string", "minLength": 1, "maxLength": 500 },
+        "content_sha256": { "$ref": "#/$defs/sha256" },
+        "semantics": { "enum": ["PRESENCE", "ABSENCE", "CONTENT", "INTERFACE"] },
+        "reason": { "type": "string", "maxLength": 1000 }
+      },
+      "oneOf": [
+        { "required": ["path"] },
+        { "required": ["glob"] }
+      ]
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["evidence_id", "kind", "relationship", "captured_at", "run_id", "redaction_status"],
+      "properties": {
+        "evidence_id": { "$ref": "#/$defs/id" },
+        "kind": { "enum": ["CODE", "TEST", "RUNTIME", "USER_EVENT", "DECISION", "EXTERNAL", "DOC", "CONFIG", "SCHEMA", "FILE"] },
+        "relationship": { "enum": ["SUPPORTS", "REFUTES", "QUALIFIES"] },
+        "repo": { "$ref": "#/$defs/actor" },
+        "path": { "$ref": "#/$defs/relative_path" },
+        "glob": { "$ref": "#/$defs/relative_path" },
+        "symbol": { "type": "string", "minLength": 1, "maxLength": 500 },
+        "line_hint": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 2,
+          "items": { "type": "integer", "minimum": 1 }
+        },
+        "revision": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "content_sha256": { "$ref": "#/$defs/sha256" },
+        "command_id": { "$ref": "#/$defs/id" },
+        "runtime_observation_id": { "$ref": "#/$defs/id" },
+        "user_event_id": { "$ref": "#/$defs/id" },
+        "decision_id": { "$ref": "#/$defs/id" },
+        "external_reference": {
+          "description": "Sanitized stable locator without credentials or secret query values.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "captured_at": { "$ref": "#/$defs/timestamp" },
+        "run_id": { "$ref": "#/$defs/id" },
+        "excerpt": {
+          "description": "Optional bounded sanitized excerpt; never raw logs, secrets, or production records.",
+          "type": "string",
+          "maxLength": 1000
+        },
+        "limitations": { "type": "string", "maxLength": 1000 },
+        "redaction_status": { "enum": ["NOT_APPLICABLE", "REVIEWED", "REDACTED"] }
+      },
+      "anyOf": [
+        { "required": ["path"] },
+        { "required": ["glob"] },
+        { "required": ["command_id"] },
+        { "required": ["runtime_observation_id"] },
+        { "required": ["user_event_id"] },
+        { "required": ["decision_id"] },
+        { "required": ["external_reference"] }
+      ]
+    },
+    "dependencies": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["records", "sources"],
+      "properties": {
+        "records": { "type": "array", "items": { "$ref": "#/$defs/id" } },
+        "sources": { "type": "array", "items": { "$ref": "#/$defs/source_selector" } }
+      }
+    },
+    "freshness_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "ttl_days"],
+      "properties": {
+        "kind": { "enum": ["ON_CHANGE", "TTL", "MANUAL"] },
+        "ttl_days": {
+          "oneOf": [
+            { "type": "integer", "minimum": 1 },
+            { "type": "null" }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "kind": { "const": "TTL" } }, "required": ["kind"] },
+          "then": { "properties": { "ttl_days": { "type": "integer", "minimum": 1 } } }
+        }
+      ]
+    },
+    "repository_snapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository_id", "status", "source_digest", "dirty_paths"],
+      "properties": {
+        "repository_id": { "$ref": "#/$defs/actor" },
+        "status": { "enum": ["CLEAN", "DIRTY", "MISSING", "UNVERSIONED"] },
+        "branch": { "type": "string", "minLength": 1, "maxLength": 255 },
+        "commit": {
+          "oneOf": [
+            { "type": "string", "pattern": "^[a-f0-9]{7,64}$" },
+            { "type": "null" }
+          ]
+        },
+        "source_tree_sha256": { "$ref": "#/$defs/sha256" },
+        "working_tree_sha256": { "$ref": "#/$defs/sha256" },
+        "source_digest": {
+          "oneOf": [
+            { "$ref": "#/$defs/sha256" },
+            { "type": "null" }
+          ]
+        },
+        "dirty_paths": { "type": "array", "items": { "$ref": "#/$defs/relative_path" } },
+        "dirty_path_sha256": {
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/relative_path" },
+          "additionalProperties": {
+            "type": "string",
+            "pattern": "^(?:[a-f0-9]{64}|MISSING)$"
+          }
+        },
+        "remote_alias": {
+          "oneOf": [
+            { "type": "string", "minLength": 1, "maxLength": 512 },
+            { "type": "null" }
+          ]
+        }
+      }
+    },
+    "source_snapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repositories", "vector_digest", "source_vector_digest"],
+      "properties": {
+        "repositories": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/repository_snapshot" } },
+        "vector_digest": { "$ref": "#/$defs/sha256" },
+        "source_vector_digest": {
+          "description": "Content-only digest that remains stable across memory-only commits.",
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "verification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["snapshot", "method", "verified_at", "verified_by"],
+      "properties": {
+        "snapshot": {
+          "oneOf": [
+            { "$ref": "#/$defs/source_snapshot" },
+            { "type": "null" }
+          ]
+        },
+        "method": {
+          "oneOf": [
+            { "type": "string", "minLength": 1, "maxLength": 1000 },
+            { "type": "null" }
+          ]
+        },
+        "verified_at": {
+          "oneOf": [
+            { "$ref": "#/$defs/timestamp" },
+            { "type": "null" }
+          ]
+        },
+        "verified_by": {
+          "oneOf": [
+            { "$ref": "#/$defs/actor" },
+            { "type": "null" }
+          ]
+        }
+      }
+    },
+    "history_entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["at", "event", "run_id", "reason"],
+      "properties": {
+        "at": { "$ref": "#/$defs/timestamp" },
+        "event": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "run_id": { "$ref": "#/$defs/id" },
+        "actor": { "$ref": "#/$defs/actor" },
+        "reason": { "type": "string", "minLength": 1, "maxLength": 2000 }
+      }
+    }
+  }
+}
