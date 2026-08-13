@@ -1,0 +1,4 @@
+interface:
+  display_name: "Evidence Retrospective"
+  short_description: "Reconstruct delivery lessons from repository evidence"
+  default_prompt: "Use $evidence-retrospective to review this completed body of work, surface systemic lessons, and propose evidence-backed follow-ups."

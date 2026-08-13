@@ -20,6 +20,7 @@ EXPECTED_SKILLS = {
     "adversarial-review",
     "decision-recon",
     "deep-plan",
+    "evidence-retrospective",
     "harvest-agent-branches",
     "reasoning-codebase-review",
     "steward-brownfield",
