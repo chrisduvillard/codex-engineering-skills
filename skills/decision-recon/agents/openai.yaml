@@ -1,0 +1,4 @@
+interface:
+  display_name: "Decision Recon"
+  short_description: "Research and pressure-test engineering choices"
+  default_prompt: "Use $decision-recon to compare these engineering options and produce an evidence-backed, reversible recommendation."

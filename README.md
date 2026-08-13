@@ -2,15 +2,15 @@
 
 # Codex Engineering Skills
 
-### Six rigorous workflows for the parts of software engineering where “looks right” is not enough.
+### Seven rigorous workflows for the parts of software engineering where “looks right” is not enough.
 
-[![Skills](https://img.shields.io/badge/skills-6-6D5EF7?style=for-the-badge)](#choose-your-skill)
+[![Skills](https://img.shields.io/badge/skills-7-6D5EF7?style=for-the-badge)](#choose-your-skill)
 [![Built for Codex](https://img.shields.io/badge/built%20for-Codex-101828?style=for-the-badge)](#installation)
 [![Validate](https://img.shields.io/github/actions/workflow/status/chrisduvillard/codex-engineering-skills/validate.yml?branch=main&style=for-the-badge&label=validation)](https://github.com/chrisduvillard/codex-engineering-skills/actions/workflows/validate.yml)
 
 <p>
   Plan uncertain work · preserve system knowledge · recover divergent branches<br>
-  trace data to its source · attack correctness claims · pressure-test assumptions
+  trace data to its source · attack correctness claims · pressure-test assumptions · research decisions
 </p>
 
 </div>
@@ -19,7 +19,7 @@
 
 Most agent instructions focus on producing code. This collection focuses on producing **justified engineering decisions**: grounded in repository evidence, constrained by explicit authority, and closed with verification.
 
-Each skill is deliberately opinionated. Together they cover six recurring failure zones in long-lived codebases.
+Each skill is deliberately opinionated. Together they cover seven recurring failure zones in long-lived codebases.
 
 ## Choose your skill
 
@@ -31,6 +31,7 @@ Each skill is deliberately opinionated. Together they cover six recurring failur
 | Explain where a value came from—or where its meaning broke | [`$trace-data-provenance`](skills/trace-data-provenance) | Traces one specimen across every semantic boundary |
 | Try to falsify a change that appears correct | [`$adversarial-review`](skills/adversarial-review) | Runs bounded attacks and reports reproducible findings |
 | Pressure-test a system from independent reasoning perspectives | [`$reasoning-codebase-review`](skills/reasoning-codebase-review) | Coordinates investigators, red/blue challenge, and evidence-based judgment |
+| Choose between consequential engineering options | [`$decision-recon`](skills/decision-recon) | Separates requirements from current evidence and preserves reversal conditions |
 
 ## The collection
 
@@ -94,6 +95,16 @@ Orchestrates independent reviewers through pre-mortem, first-principles, inversi
 Use $reasoning-codebase-review to pressure-test this codebase through independent reasoning methods.
 ```
 
+### 07 · Decision Recon
+
+Turns technology, vendor, architecture, migration, and build-versus-buy choices into evidence-backed decisions. It frames hard gates before researching candidates, tracks claim freshness, exposes lock-in and lifecycle cost, tests sensitivity, and challenges the provisional leader before recommending it.
+
+> **Use it when:** the expensive part is choosing—and being able to explain when that choice should change.
+
+```text
+Use $decision-recon to compare these options and produce a reversible, evidence-backed recommendation.
+```
+
 ## Installation
 
 Clone the collection:
@@ -120,7 +131,7 @@ Restart Codex after installation, then invoke a skill explicitly with its `$name
 
 ## A shared operating philosophy
 
-The six skills are different tools, but they enforce the same engineering instincts:
+The seven skills are different tools, but they enforce the same engineering instincts:
 
 - **Evidence before confidence.** Read the repository, contracts, history, and runtime artifacts.
 - **Risk before tidiness.** Detect breakage and secure boundaries before restructuring code.
@@ -142,7 +153,9 @@ skills/
 ├── trace-data-provenance/
 ├── adversarial-review/
 │   └── references/
-└── reasoning-codebase-review/
+├── reasoning-codebase-review/
+│   └── references/
+└── decision-recon/
     └── references/
 ```
 
@@ -163,7 +176,7 @@ python3 -m unittest discover -s skills/steward-brownfield/tests -p 'test_*.py'
 
 ## Inspiration
 
-Reasoning Codebase Review was informed by BMAD-METHOD's [reasoning catalog](https://github.com/bmad-code-org/BMAD-METHOD/blob/c4ec1837b8b7ffbf09a7aebb4891c38f93899f58/src/core-skills/bmad-advanced-elicitation/assets/methods.csv), [independent-agent discussions](https://github.com/bmad-code-org/BMAD-METHOD/blob/c4ec1837b8b7ffbf09a7aebb4891c38f93899f58/src/core-skills/bmad-party-mode/references/mode-subagent.md), and [review orchestration](https://github.com/bmad-code-org/BMAD-METHOD/blob/c4ec1837b8b7ffbf09a7aebb4891c38f93899f58/src/core-skills/bmad-review/SKILL.md), then redesigned around this collection's evidence, authority, and bounded-risk contracts.
+Reasoning Codebase Review was informed by BMAD-METHOD's [reasoning catalog](https://github.com/bmad-code-org/BMAD-METHOD/blob/c4ec1837b8b7ffbf09a7aebb4891c38f93899f58/src/core-skills/bmad-advanced-elicitation/assets/methods.csv), [independent-agent discussions](https://github.com/bmad-code-org/BMAD-METHOD/blob/c4ec1837b8b7ffbf09a7aebb4891c38f93899f58/src/core-skills/bmad-party-mode/references/mode-subagent.md), and [review orchestration](https://github.com/bmad-code-org/BMAD-METHOD/blob/c4ec1837b8b7ffbf09a7aebb4891c38f93899f58/src/core-skills/bmad-review/SKILL.md). Decision Recon adapts the research firewall, claim verification, selection frame, and staleness discipline from [Deep Recon](https://github.com/bmad-code-org/BMAD-METHOD/blob/c4ec1837b8b7ffbf09a7aebb4891c38f93899f58/src/core-skills/bmad-deep-recon/SKILL.md). Both are redesigned around this collection's evidence, authority, and bounded-risk contracts.
 
 ## Contributing
 
