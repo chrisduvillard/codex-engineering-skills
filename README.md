@@ -2,15 +2,15 @@
 
 # Codex Engineering Skills
 
-### Five rigorous workflows for the parts of software engineering where “looks right” is not enough.
+### Six rigorous workflows for the parts of software engineering where “looks right” is not enough.
 
-[![Skills](https://img.shields.io/badge/skills-5-6D5EF7?style=for-the-badge)](#choose-your-skill)
+[![Skills](https://img.shields.io/badge/skills-6-6D5EF7?style=for-the-badge)](#choose-your-skill)
 [![Built for Codex](https://img.shields.io/badge/built%20for-Codex-101828?style=for-the-badge)](#installation)
 [![Validate](https://img.shields.io/github/actions/workflow/status/chrisduvillard/codex-engineering-skills/validate.yml?branch=main&style=for-the-badge&label=validation)](https://github.com/chrisduvillard/codex-engineering-skills/actions/workflows/validate.yml)
 
 <p>
   Plan uncertain work · preserve system knowledge · recover divergent branches<br>
-  trace data to its source · attack correctness claims
+  trace data to its source · attack correctness claims · pressure-test assumptions
 </p>
 
 </div>
@@ -19,7 +19,7 @@
 
 Most agent instructions focus on producing code. This collection focuses on producing **justified engineering decisions**: grounded in repository evidence, constrained by explicit authority, and closed with verification.
 
-Each skill is deliberately opinionated. Together they cover five recurring failure zones in long-lived codebases.
+Each skill is deliberately opinionated. Together they cover six recurring failure zones in long-lived codebases.
 
 ## Choose your skill
 
@@ -30,6 +30,7 @@ Each skill is deliberately opinionated. Together they cover five recurring failu
 | Recover useful work from a stale, divergent, or oversized branch | [`$harvest-agent-branches`](skills/harvest-agent-branches) | Ports coherent slices without overwriting newer work |
 | Explain where a value came from—or where its meaning broke | [`$trace-data-provenance`](skills/trace-data-provenance) | Traces one specimen across every semantic boundary |
 | Try to falsify a change that appears correct | [`$adversarial-review`](skills/adversarial-review) | Runs bounded attacks and reports reproducible findings |
+| Pressure-test a system from independent reasoning perspectives | [`$reasoning-codebase-review`](skills/reasoning-codebase-review) | Coordinates investigators, red/blue challenge, and evidence-based judgment |
 
 ## The collection
 
@@ -83,6 +84,16 @@ Attempts to falsify behavioral and security correctness rather than merely confi
 Use $adversarial-review to attack this change with adaptive edge-case tests.
 ```
 
+### 06 · Reasoning Codebase Review
+
+Orchestrates independent reviewers through pre-mortem, first-principles, inversion, Socratic, constraint, stakeholder, and analogical lenses. It then subjects normalized claims to separate red and blue challengers before the coordinator accepts, qualifies, or rejects them.
+
+> **Use it when:** an architecture or codebase needs more than one mental model—and the disagreements matter as much as the findings.
+
+```text
+Use $reasoning-codebase-review to pressure-test this codebase through independent reasoning methods.
+```
+
 ## Installation
 
 Clone the collection:
@@ -109,7 +120,7 @@ Restart Codex after installation, then invoke a skill explicitly with its `$name
 
 ## A shared operating philosophy
 
-The five skills are different tools, but they enforce the same engineering instincts:
+The six skills are different tools, but they enforce the same engineering instincts:
 
 - **Evidence before confidence.** Read the repository, contracts, history, and runtime artifacts.
 - **Risk before tidiness.** Detect breakage and secure boundaries before restructuring code.
@@ -129,7 +140,9 @@ skills/
 │   └── tests/
 ├── harvest-agent-branches/
 ├── trace-data-provenance/
-└── adversarial-review/
+├── adversarial-review/
+│   └── references/
+└── reasoning-codebase-review/
     └── references/
 ```
 
@@ -137,14 +150,20 @@ Every skill is rooted at a `SKILL.md`. Supporting metadata lives in `agents/`; l
 
 ## Validation
 
-The repository checks skill names, frontmatter, expected files, generated artifacts, Python syntax, and the Brownfield Steward test suite on every push and pull request.
+The repository checks skill names, parsed frontmatter, local support links, agent metadata, Python syntax, validator regressions, and the Brownfield Steward test suite on pull requests and pushes to `main`.
 
 Run the same checks locally:
 
 ```bash
+python3 -m pip install -r requirements-dev.txt
 python3 scripts/validate_skills.py
+python3 -m unittest discover -s tests -p 'test_*.py'
 python3 -m unittest discover -s skills/steward-brownfield/tests -p 'test_*.py'
 ```
+
+## Inspiration
+
+Reasoning Codebase Review was informed by BMAD-METHOD's [reasoning catalog](https://github.com/bmad-code-org/BMAD-METHOD/blob/c4ec1837b8b7ffbf09a7aebb4891c38f93899f58/src/core-skills/bmad-advanced-elicitation/assets/methods.csv), [independent-agent discussions](https://github.com/bmad-code-org/BMAD-METHOD/blob/c4ec1837b8b7ffbf09a7aebb4891c38f93899f58/src/core-skills/bmad-party-mode/references/mode-subagent.md), and [review orchestration](https://github.com/bmad-code-org/BMAD-METHOD/blob/c4ec1837b8b7ffbf09a7aebb4891c38f93899f58/src/core-skills/bmad-review/SKILL.md), then redesigned around this collection's evidence, authority, and bounded-risk contracts.
 
 ## Contributing
 

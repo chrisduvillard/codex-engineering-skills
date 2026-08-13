@@ -1,0 +1,6 @@
+interface:
+  display_name: "Reasoning Codebase Review"
+  short_description: "Review code through independent reasoning lenses"
+  default_prompt: "Use $reasoning-codebase-review to pressure-test this codebase through independent reasoning methods and synthesize evidence-backed findings."
+policy:
+  allow_implicit_invocation: false
