@@ -2,15 +2,15 @@
 
 # Codex Engineering Skills
 
-### Ten rigorous workflows for the parts of software engineering where “looks right” is not enough.
+### Eleven rigorous workflows for the parts of software engineering where “looks right” is not enough.
 
-[![Skills](https://img.shields.io/badge/skills-10-6D5EF7?style=for-the-badge)](#choose-your-skill)
+[![Skills](https://img.shields.io/badge/skills-11-6D5EF7?style=for-the-badge)](#choose-your-skill)
 [![Built for Codex](https://img.shields.io/badge/built%20for-Codex-101828?style=for-the-badge)](#installation)
 [![Validate](https://img.shields.io/github/actions/workflow/status/chrisduvillard/codex-engineering-skills/validate.yml?branch=main&style=for-the-badge&label=validation)](https://github.com/chrisduvillard/codex-engineering-skills/actions/workflows/validate.yml)
 
 <p>
   Plan uncertain work · preserve system knowledge · recover divergent branches<br>
-  trace data · attack correctness · pressure-test assumptions · research decisions · forge ideas
+  trace data · attack correctness · pressure-test assumptions · research decisions · prune context
 </p>
 
 </div>
@@ -19,7 +19,7 @@
 
 Most agent instructions focus on producing code. This collection focuses on producing **justified engineering decisions**: grounded in repository evidence, constrained by explicit authority, and closed with verification.
 
-Each skill is deliberately opinionated. Together they cover ten recurring failure zones in long-lived codebases.
+Each skill is deliberately opinionated. Together they cover eleven recurring failure zones in long-lived codebases.
 
 ## Choose your skill
 
@@ -35,6 +35,7 @@ Each skill is deliberately opinionated. Together they cover ten recurring failur
 | Learn from a completed body of engineering work | [`$evidence-retrospective`](skills/evidence-retrospective) | Reconstructs goals, diffs, verification, systemic patterns, and follow-through |
 | Understand a change before making a human review call | [`$checkpoint-walkthrough`](skills/checkpoint-walkthrough) | Builds a concern-grouped trail, risk prompts, observations, and decision packet |
 | Pressure-test an idea while changing direction is cheap | [`$idea-forge`](skills/idea-forge) | Attacks assumptions, defends the strongest version, and renders an honest outcome |
+| Keep repository agent instructions useful without letting context sprawl | [`$context-pruner`](skills/context-pruner) | Verifies loading, accounts for every rule, and prunes only with evidence |
 
 ## The collection
 
@@ -138,6 +139,16 @@ Pressure-tests a product, feature, architecture, workflow, or business concept b
 Use $idea-forge to attack this idea, defend what survives, and render an honest outcome.
 ```
 
+### 11 · Context Pruner
+
+Treats always-loaded agent instructions as scarce infrastructure. It maps what each harness actually loads, verifies rules against the repository, tracks every instruction through a change ledger, prefers mechanical enforcement, and removes human-authored guidance only when evidence or explicit approval supports it.
+
+> **Use it when:** `AGENTS.md`, `CLAUDE.md`, Copilot, Cursor, or linked rule files have become stale, contradictory, duplicated, or simply too large to trust.
+
+```text
+Use $context-pruner to audit this repository’s agent instructions and remove context debt safely.
+```
+
 ## Installation
 
 Clone the collection:
@@ -164,7 +175,7 @@ Restart Codex after installation, then invoke a skill explicitly with its `$name
 
 ## A shared operating philosophy
 
-The ten skills are different tools, but they enforce the same engineering instincts:
+The eleven skills are different tools, but they enforce the same engineering instincts:
 
 - **Evidence before confidence.** Read the repository, contracts, history, and runtime artifacts.
 - **Risk before tidiness.** Detect breakage and secure boundaries before restructuring code.
@@ -194,7 +205,9 @@ skills/
 │   └── references/
 ├── checkpoint-walkthrough/
 │   └── references/
-└── idea-forge/
+├── idea-forge/
+│   └── references/
+└── context-pruner/
     └── references/
 ```
 
@@ -215,7 +228,7 @@ python3 -m unittest discover -s skills/steward-brownfield/tests -p 'test_*.py'
 
 ## Inspiration
 
-Reasoning Codebase Review was informed by BMAD-METHOD's [reasoning catalog](https://github.com/bmad-code-org/BMAD-METHOD/blob/c4ec1837b8b7ffbf09a7aebb4891c38f93899f58/src/core-skills/bmad-advanced-elicitation/assets/methods.csv), [independent-agent discussions](https://github.com/bmad-code-org/BMAD-METHOD/blob/c4ec1837b8b7ffbf09a7aebb4891c38f93899f58/src/core-skills/bmad-party-mode/references/mode-subagent.md), and [review orchestration](https://github.com/bmad-code-org/BMAD-METHOD/blob/c4ec1837b8b7ffbf09a7aebb4891c38f93899f58/src/core-skills/bmad-review/SKILL.md). Decision Recon adapts the research firewall, claim verification, selection frame, and staleness discipline from [Deep Recon](https://github.com/bmad-code-org/BMAD-METHOD/blob/c4ec1837b8b7ffbf09a7aebb4891c38f93899f58/src/core-skills/bmad-deep-recon/SKILL.md). Evidence Retrospective generalizes BMAD's [repository-grounded retrospective](https://github.com/bmad-code-org/BMAD-METHOD/blob/c4ec1837b8b7ffbf09a7aebb4891c38f93899f58/src/bmm-skills/ship/bmad-retrospective/SKILL.md) beyond its epic workflow. Checkpoint Walkthrough adapts BMAD's [human checkpoint review](https://github.com/bmad-code-org/BMAD-METHOD/blob/c4ec1837b8b7ffbf09a7aebb4891c38f93899f58/src/bmm-skills/ship/bmad-checkpoint-preview/SKILL.md) into a host-aware, authority-bounded walkthrough. Idea Forge distills BMAD's [conversational idea forge](https://github.com/bmad-code-org/BMAD-METHOD/blob/c4ec1837b8b7ffbf09a7aebb4891c38f93899f58/src/core-skills/bmad-forge-idea/SKILL.md) into a reusable pressure-test with explicit outcomes. All five are redesigned around this collection's evidence and risk contracts.
+Reasoning Codebase Review was informed by BMAD-METHOD's [reasoning catalog](https://github.com/bmad-code-org/BMAD-METHOD/blob/c4ec1837b8b7ffbf09a7aebb4891c38f93899f58/src/core-skills/bmad-advanced-elicitation/assets/methods.csv), [independent-agent discussions](https://github.com/bmad-code-org/BMAD-METHOD/blob/c4ec1837b8b7ffbf09a7aebb4891c38f93899f58/src/core-skills/bmad-party-mode/references/mode-subagent.md), and [review orchestration](https://github.com/bmad-code-org/BMAD-METHOD/blob/c4ec1837b8b7ffbf09a7aebb4891c38f93899f58/src/core-skills/bmad-review/SKILL.md). Decision Recon adapts the research firewall, claim verification, selection frame, and staleness discipline from [Deep Recon](https://github.com/bmad-code-org/BMAD-METHOD/blob/c4ec1837b8b7ffbf09a7aebb4891c38f93899f58/src/core-skills/bmad-deep-recon/SKILL.md). Evidence Retrospective generalizes BMAD's [repository-grounded retrospective](https://github.com/bmad-code-org/BMAD-METHOD/blob/c4ec1837b8b7ffbf09a7aebb4891c38f93899f58/src/bmm-skills/ship/bmad-retrospective/SKILL.md) beyond its epic workflow. Checkpoint Walkthrough adapts BMAD's [human checkpoint review](https://github.com/bmad-code-org/BMAD-METHOD/blob/c4ec1837b8b7ffbf09a7aebb4891c38f93899f58/src/bmm-skills/ship/bmad-checkpoint-preview/SKILL.md) into a host-aware, authority-bounded walkthrough. Idea Forge distills BMAD's [conversational idea forge](https://github.com/bmad-code-org/BMAD-METHOD/blob/c4ec1837b8b7ffbf09a7aebb4891c38f93899f58/src/core-skills/bmad-forge-idea/SKILL.md) into a reusable pressure-test with explicit outcomes. Context Pruner generalizes BMAD's [project context workflow](https://github.com/bmad-code-org/BMAD-METHOD/blob/c4ec1837b8b7ffbf09a7aebb4891c38f93899f58/src/bmm-skills/plan/bmad-project-context/SKILL.md) into a harness-aware, evidence-led system for controlling always-loaded instructions. All six are redesigned around this collection's evidence and risk contracts.
 
 ## Contributing
 

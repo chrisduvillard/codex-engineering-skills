@@ -19,6 +19,7 @@ SKILLS_ROOT = ROOT / "skills"
 EXPECTED_SKILLS = {
     "adversarial-review",
     "checkpoint-walkthrough",
+    "context-pruner",
     "decision-recon",
     "deep-plan",
     "evidence-retrospective",

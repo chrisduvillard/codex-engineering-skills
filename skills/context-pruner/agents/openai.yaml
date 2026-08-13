@@ -1,0 +1,4 @@
+interface:
+  display_name: "Context Pruner"
+  short_description: "Keep repository agent instructions small and verified"
+  default_prompt: "Use $context-pruner to audit this repository’s agent instructions, remove context debt safely, and retain only verified rules that change behavior."
