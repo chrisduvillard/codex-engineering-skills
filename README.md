@@ -6,6 +6,7 @@
 
 [![Skills](https://img.shields.io/badge/skills-11-6D5EF7?style=for-the-badge)](#choose-your-skill)
 [![Built for Codex](https://img.shields.io/badge/built%20for-Codex-101828?style=for-the-badge)](#installation)
+[![License: MIT](https://img.shields.io/badge/license-MIT-22C55E?style=for-the-badge)](LICENSE)
 [![Validate](https://img.shields.io/github/actions/workflow/status/chrisduvillard/codex-engineering-skills/validate.yml?branch=main&style=for-the-badge&label=validation)](https://github.com/chrisduvillard/codex-engineering-skills/actions/workflows/validate.yml)
 
 <p>
@@ -225,6 +226,10 @@ python3 scripts/validate_skills.py
 python3 -m unittest discover -s tests -p 'test_*.py'
 python3 -m unittest discover -s skills/steward-brownfield/tests -p 'test_*.py'
 ```
+
+## License
+
+Released under the [MIT License](LICENSE).
 
 ## Contributing
 
