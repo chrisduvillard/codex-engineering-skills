@@ -2,15 +2,15 @@
 
 # Codex Engineering Skills
 
-### Eight rigorous workflows for the parts of software engineering where “looks right” is not enough.
+### Nine rigorous workflows for the parts of software engineering where “looks right” is not enough.
 
-[![Skills](https://img.shields.io/badge/skills-8-6D5EF7?style=for-the-badge)](#choose-your-skill)
+[![Skills](https://img.shields.io/badge/skills-9-6D5EF7?style=for-the-badge)](#choose-your-skill)
 [![Built for Codex](https://img.shields.io/badge/built%20for-Codex-101828?style=for-the-badge)](#installation)
 [![Validate](https://img.shields.io/github/actions/workflow/status/chrisduvillard/codex-engineering-skills/validate.yml?branch=main&style=for-the-badge&label=validation)](https://github.com/chrisduvillard/codex-engineering-skills/actions/workflows/validate.yml)
 
 <p>
   Plan uncertain work · preserve system knowledge · recover divergent branches<br>
-  trace data · attack correctness · pressure-test assumptions · research decisions · learn from delivery
+  trace data · attack correctness · pressure-test assumptions · research decisions · guide human review
 </p>
 
 </div>
@@ -19,7 +19,7 @@
 
 Most agent instructions focus on producing code. This collection focuses on producing **justified engineering decisions**: grounded in repository evidence, constrained by explicit authority, and closed with verification.
 
-Each skill is deliberately opinionated. Together they cover eight recurring failure zones in long-lived codebases.
+Each skill is deliberately opinionated. Together they cover nine recurring failure zones in long-lived codebases.
 
 ## Choose your skill
 
@@ -33,6 +33,7 @@ Each skill is deliberately opinionated. Together they cover eight recurring fail
 | Pressure-test a system from independent reasoning perspectives | [`$reasoning-codebase-review`](skills/reasoning-codebase-review) | Coordinates investigators, red/blue challenge, and evidence-based judgment |
 | Choose between consequential engineering options | [`$decision-recon`](skills/decision-recon) | Separates requirements from current evidence and preserves reversal conditions |
 | Learn from a completed body of engineering work | [`$evidence-retrospective`](skills/evidence-retrospective) | Reconstructs goals, diffs, verification, systemic patterns, and follow-through |
+| Understand a change before making a human review call | [`$checkpoint-walkthrough`](skills/checkpoint-walkthrough) | Builds a concern-grouped trail, risk prompts, observations, and decision packet |
 
 ## The collection
 
@@ -116,6 +117,16 @@ Reconstructs a release, milestone, sprint, migration, or multi-session feature f
 Use $evidence-retrospective to review this milestone and propose sourced, owned follow-ups.
 ```
 
+### 09 · Checkpoint Walkthrough
+
+Guides a human from intent and surface-area orientation through a concern-grouped code trail, high-blast-radius questions, and safe ways to observe behavior. It keeps risk prompts separate from verified defects and ends with an explicitly bounded Approve, Rework, or Discuss decision.
+
+> **Use it when:** a diff needs to become understandable before it can become acceptable.
+
+```text
+Use $checkpoint-walkthrough to show me what changed, where to look, and what remains a judgment call.
+```
+
 ## Installation
 
 Clone the collection:
@@ -142,7 +153,7 @@ Restart Codex after installation, then invoke a skill explicitly with its `$name
 
 ## A shared operating philosophy
 
-The eight skills are different tools, but they enforce the same engineering instincts:
+The nine skills are different tools, but they enforce the same engineering instincts:
 
 - **Evidence before confidence.** Read the repository, contracts, history, and runtime artifacts.
 - **Risk before tidiness.** Detect breakage and secure boundaries before restructuring code.
@@ -168,7 +179,9 @@ skills/
 │   └── references/
 ├── decision-recon/
 │   └── references/
-└── evidence-retrospective/
+├── evidence-retrospective/
+│   └── references/
+└── checkpoint-walkthrough/
     └── references/
 ```
 
@@ -189,7 +202,7 @@ python3 -m unittest discover -s skills/steward-brownfield/tests -p 'test_*.py'
 
 ## Inspiration
 
-Reasoning Codebase Review was informed by BMAD-METHOD's [reasoning catalog](https://github.com/bmad-code-org/BMAD-METHOD/blob/c4ec1837b8b7ffbf09a7aebb4891c38f93899f58/src/core-skills/bmad-advanced-elicitation/assets/methods.csv), [independent-agent discussions](https://github.com/bmad-code-org/BMAD-METHOD/blob/c4ec1837b8b7ffbf09a7aebb4891c38f93899f58/src/core-skills/bmad-party-mode/references/mode-subagent.md), and [review orchestration](https://github.com/bmad-code-org/BMAD-METHOD/blob/c4ec1837b8b7ffbf09a7aebb4891c38f93899f58/src/core-skills/bmad-review/SKILL.md). Decision Recon adapts the research firewall, claim verification, selection frame, and staleness discipline from [Deep Recon](https://github.com/bmad-code-org/BMAD-METHOD/blob/c4ec1837b8b7ffbf09a7aebb4891c38f93899f58/src/core-skills/bmad-deep-recon/SKILL.md). Evidence Retrospective generalizes BMAD's [repository-grounded retrospective](https://github.com/bmad-code-org/BMAD-METHOD/blob/c4ec1837b8b7ffbf09a7aebb4891c38f93899f58/src/bmm-skills/ship/bmad-retrospective/SKILL.md) beyond its epic workflow. All three are redesigned around this collection's evidence, authority, and bounded-risk contracts.
+Reasoning Codebase Review was informed by BMAD-METHOD's [reasoning catalog](https://github.com/bmad-code-org/BMAD-METHOD/blob/c4ec1837b8b7ffbf09a7aebb4891c38f93899f58/src/core-skills/bmad-advanced-elicitation/assets/methods.csv), [independent-agent discussions](https://github.com/bmad-code-org/BMAD-METHOD/blob/c4ec1837b8b7ffbf09a7aebb4891c38f93899f58/src/core-skills/bmad-party-mode/references/mode-subagent.md), and [review orchestration](https://github.com/bmad-code-org/BMAD-METHOD/blob/c4ec1837b8b7ffbf09a7aebb4891c38f93899f58/src/core-skills/bmad-review/SKILL.md). Decision Recon adapts the research firewall, claim verification, selection frame, and staleness discipline from [Deep Recon](https://github.com/bmad-code-org/BMAD-METHOD/blob/c4ec1837b8b7ffbf09a7aebb4891c38f93899f58/src/core-skills/bmad-deep-recon/SKILL.md). Evidence Retrospective generalizes BMAD's [repository-grounded retrospective](https://github.com/bmad-code-org/BMAD-METHOD/blob/c4ec1837b8b7ffbf09a7aebb4891c38f93899f58/src/bmm-skills/ship/bmad-retrospective/SKILL.md) beyond its epic workflow. Checkpoint Walkthrough adapts BMAD's [human checkpoint review](https://github.com/bmad-code-org/BMAD-METHOD/blob/c4ec1837b8b7ffbf09a7aebb4891c38f93899f58/src/bmm-skills/ship/bmad-checkpoint-preview/SKILL.md) into a host-aware, authority-bounded walkthrough. All four are redesigned around this collection's evidence and risk contracts.
 
 ## Contributing
 
