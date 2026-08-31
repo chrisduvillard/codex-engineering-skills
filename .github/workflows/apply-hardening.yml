@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   apply:
-    if: github.actor != 'github-actions[bot]]'
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -35,7 +35,7 @@ jobs:
       - name: Apply approved changes
         run: python scripts/apply_audit_hardening.py
 
-      - name: Repair regex replacement escape semantics
+      - name: Repair generated escape semantics
         shell: bash
         run: |
           python - <<'PY'
@@ -43,17 +43,29 @@ jobs:
 
           path = Path('skills/steward-brownfield/scripts/brownfield_core.py')
           data = path.read_bytes()
-          count = data.count(b'\x00')
-          if count != 2:
-              raise SystemExit(f'Expected exactly two generated NUL bytes, found {count}')
-          path.write_bytes(data.replace(b'\x00', b'\\0'))
+
+          nul_count = data.count(b'\x00')
+          if nul_count != 2:
+              raise SystemExit(f'Expected exactly two generated NUL bytes, found {nul_count}')
+          data = data.replace(b'\x00', b'\\0')
+
+          bad = b'or "\\" in pattern:'
+          good = b'or "\\\\" in pattern:'
+          bad_count = data.count(bad)
+          if bad_count != 1:
+              raise SystemExit(f'Expected exactly one malformed backslash check, found {bad_count}')
+          data = data.replace(bad, good, 1)
+
+          path.write_bytes(data)
           PY
+          python -m py_compile skills/steward-brownfield/scripts/brownfield_core.py
 
       - name: Diagnose generated Python sources
         shell: bash
         run: |
           python - <<'PY'
           from pathlib import Path
+          import py_compile
           import sys
 
           failures = []
@@ -61,12 +73,16 @@ jobs:
               data = path.read_bytes()
               positions = [index for index, value in enumerate(data) if value == 0]
               if positions:
-                  failures.append((path, positions[:20]))
+                  failures.append(f'embedded NUL bytes: {path}: {positions[:20]}')
+                  continue
+              try:
+                  py_compile.compile(path, doraise=True)
+              except py_compile.PyCompileError as exc:
+                  failures.append(str(exc))
           if failures:
-              for path, positions in failures:
-                  print(f'embedded NUL bytes: {path}: {positions}')
+              print('\n'.join(failures))
               sys.exit(1)
-          print('No embedded NUL bytes found.')
+          print('All Python sources compile without embedded NUL bytes.')
           PY
 
       - name: Install validation dependencies
