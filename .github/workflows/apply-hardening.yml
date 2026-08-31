@@ -69,25 +69,26 @@ jobs:
 
           cli_path = Path('skills/steward-brownfield/scripts/brownfield.py')
           cli = cli_path.read_text(encoding='utf-8')
-          violations_block = r'''    violations = source_envelope_violations(root, manifest, run, current)
-          if violations:
-              raise BrownfieldError("Run source changes violate its authorization envelope:\n- " + "\n- ".join(violations))
-
-          '''
-          invalid_block = r'''    if invalid_checks:
-              raise BrownfieldError(
-                  "Required verification receipts are not current PASS results: " + ", ".join(invalid_checks)
-              )
-          '''
-          if cli.count(violations_block) != 1:
-              raise SystemExit('Expected exactly one pre-receipt source-violation block')
-          if cli.count(invalid_block) != 1:
-              raise SystemExit('Expected exactly one invalid-receipt block')
-          cli = cli.replace(violations_block, '', 1)
-          cli = cli.replace(
-              invalid_block,
-              invalid_block + '\n' + violations_block.rstrip() + '\n',
-              1,
+          function_start = cli.index('def verified_finish_snapshot')
+          violations_start = cli.index(
+              '    violations = source_envelope_violations(root, manifest, run, current)',
+              function_start,
+          )
+          receipts_start = cli.index('    required_checks = ', violations_start)
+          return_start = cli.index('    return current\n', receipts_start)
+          violations_block = cli[violations_start:receipts_start]
+          receipts_block = cli[receipts_start:return_start]
+          if 'if violations:' not in violations_block:
+              raise SystemExit('Source-violation block was not located safely')
+          if 'Required verification receipts are missing' not in receipts_block:
+              raise SystemExit('Verification-receipt block was not located safely')
+          cli = (
+              cli[:violations_start]
+              + receipts_block.rstrip()
+              + '\n\n'
+              + violations_block.rstrip()
+              + '\n'
+              + cli[return_start:]
           )
           cli_path.write_text(cli, encoding='utf-8', newline='\n')
 
