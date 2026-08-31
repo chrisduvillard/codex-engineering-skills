@@ -1,0 +1,113 @@
+name: Apply final review fixes
+
+on:
+  push:
+    branches: [audit-hardening-v1.0.1]
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: audit-hardening-v1.0.1
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.13'
+
+      - name: Apply review fixes
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          core_path = Path('skills/steward-brownfield/scripts/brownfield_core.py')
+          core = core_path.read_text(encoding='utf-8')
+
+          start = core.index('def _schema_root_for')
+          end = core.index('\n\ndef _schema_errors', start)
+          core = (
+              core[:start]
+              + 'def _schema_root_for(path: Path | None) -> Path:\n'
+              + '    """Use the bundled writer schema as the immutable validation authority."""\n'
+              + '    return ASSET_SCHEMA_ROOT\n'
+              + core[end:]
+          )
+
+          old_sort = 'issues = sorted(validator.iter_errors(value), key=lambda item: list(item.absolute_path))'
+          new_sort = (
+              'issues = sorted(\n'
+              '            validator.iter_errors(value),\n'
+              '            key=lambda item: tuple(\n'
+              '                f"{type(part).__name__}:{part}" for part in item.absolute_path\n'
+              '            ),\n'
+              '        )'
+          )
+          if core.count(old_sort) != 1:
+              raise SystemExit('Expected one schema-error sorting expression')
+          core = core.replace(old_sort, new_sort, 1)
+
+          anchor = '''    for relative in required:\n        if not safe_child(memory, relative).exists():\n            errors.append(f"Missing required file: {relative}")\n'''
+          integrity = '''    schema_names = (\n        "manifest.schema.json", "policy.schema.json", "state.schema.json",\n        "record.schema.json", "run.schema.json", "contribution.schema.json",\n    )\n    for schema_name in schema_names:\n        copied = memory / "schemas" / schema_name\n        bundled = ASSET_SCHEMA_ROOT / schema_name\n        if not copied.is_file():\n            errors.append(f"Missing required schema: schemas/{schema_name}")\n            continue\n        try:\n            if read_json(copied) != read_json(bundled):\n                errors.append(\n                    f"Copied schema differs from bundled writer authority: schemas/{schema_name}"\n                )\n        except BrownfieldError as exc:\n            errors.append(str(exc))\n'''
+          if core.count(anchor) != 1:
+              raise SystemExit('Expected one required-file validation anchor')
+          core = core.replace(anchor, anchor + integrity, 1)
+          core_path.write_text(core, encoding='utf-8', newline='\n')
+
+          cli_path = Path('skills/steward-brownfield/scripts/brownfield.py')
+          cli = cli_path.read_text(encoding='utf-8')
+          old_popen = '    process = subprocess.Popen(argv, cwd=cwd, **kwargs)\n'
+          new_popen = (
+              '    try:\n'
+              '        process = subprocess.Popen(argv, cwd=cwd, **kwargs)\n'
+              '    except OSError as exc:\n'
+              '        raise BrownfieldError(f"Cannot start verification command: {exc}") from exc\n'
+          )
+          if cli.count(old_popen) != 1:
+              raise SystemExit('Expected one verification Popen call')
+          cli = cli.replace(old_popen, new_popen, 1)
+          cli_path.write_text(cli, encoding='utf-8', newline='\n')
+
+          test_path = Path('skills/steward-brownfield/tests/test_brownfield.py')
+          tests = test_path.read_text(encoding='utf-8')
+          insertion = '''\n    def test_tampered_copied_schema_is_rejected(self) -> None:\n        self.init_memory()\n        schema = self.repo / ".brownfield" / "schemas" / "record.schema.json"\n        schema.write_text("{}\\n", encoding="utf-8")\n\n        result = self.invoke_json("validate", "--root", self.repo, "--strict", expected=1)\n\n        self.assertTrue(\n            any("Copied schema differs" in error for error in result["errors"]),\n            result["errors"],\n        )\n\n    def test_verify_missing_executable_fails_cleanly(self) -> None:\n        self.init_memory()\n        run_id = self.begin_source_writing()\n\n        result = self.invoke(\n            "verify", "--root", self.repo, "--run", run_id,\n            "--name", "missing-command", "--",\n            "brownfield-command-that-does-not-exist-42",\n        )\n\n        self.assertEqual(2, result.returncode)\n        payload = json.loads(result.stdout)\n        self.assertIn("Cannot start verification command", payload["error"])\n        self.assertNotIn("Traceback", result.stderr)\n'''
+          marker = '\nif __name__ == "__main__":\n'
+          if tests.count(marker) != 1:
+              raise SystemExit('Expected one unittest module marker')
+          tests = tests.replace(marker, insertion + marker, 1)
+          test_path.write_text(tests, encoding='utf-8', newline='\n')
+          PY
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements-dev.txt
+
+      - name: Run full validation
+        shell: bash
+        run: |
+          python -m py_compile skills/steward-brownfield/scripts/brownfield_core.py
+          python -m py_compile skills/steward-brownfield/scripts/brownfield.py
+          python scripts/validate_skills.py
+          python scripts/validate_catalog.py
+          python -m unittest discover -s tests -p 'test_*.py'
+          python -m unittest discover -s skills/steward-brownfield/tests -p 'test_*.py'
+          git diff --check
+
+      - name: Commit source fixes
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add skills/steward-brownfield/scripts/brownfield_core.py
+          git add skills/steward-brownfield/scripts/brownfield.py
+          git add skills/steward-brownfield/tests/test_brownfield.py
+          git commit -m 'Close final Brownfield validation gaps'
+          git push origin HEAD:audit-hardening-v1.0.1
