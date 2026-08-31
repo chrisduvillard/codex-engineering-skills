@@ -35,6 +35,26 @@ jobs:
       - name: Apply approved changes
         run: python scripts/apply_audit_hardening.py
 
+      - name: Diagnose generated Python sources
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import sys
+
+          failures = []
+          for path in sorted(Path('.').rglob('*.py')):
+              data = path.read_bytes()
+              positions = [index for index, value in enumerate(data) if value == 0]
+              if positions:
+                  failures.append((path, positions[:20]))
+          if failures:
+              for path, positions in failures:
+                  print(f'embedded NUL bytes: {path}: {positions}')
+              sys.exit(1)
+          print('No embedded NUL bytes found.')
+          PY
+
       - name: Install validation dependencies
         run: python -m pip install -r requirements-dev.txt
 
