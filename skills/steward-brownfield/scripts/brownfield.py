@@ -939,7 +939,10 @@ def _run_verification(argv: list[str], cwd: Path, timeout_seconds: int) -> tuple
         kwargs["creationflags"] = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
     else:
         kwargs["start_new_session"] = True
-    process = subprocess.Popen(argv, cwd=cwd, **kwargs)
+    try:
+        process = subprocess.Popen(argv, cwd=cwd, **kwargs)
+    except OSError as exc:
+        raise BrownfieldError(f"Cannot start verification command: {exc}") from exc
     try:
         stdout, stderr = process.communicate(timeout=timeout_seconds)
         return process.returncode, stdout, stderr, False

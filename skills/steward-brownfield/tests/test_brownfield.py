@@ -1129,5 +1129,32 @@ class BrownfieldCliTests(unittest.TestCase):
         )
         self.assertIn("not current PASS results", result["error"])
 
+    def test_tampered_copied_schema_is_rejected(self) -> None:
+        self.init_memory()
+        schema = self.repo / ".brownfield" / "schemas" / "record.schema.json"
+        schema.write_text("{}\n", encoding="utf-8")
+
+        result = self.invoke_json("validate", "--root", self.repo, "--strict", expected=1)
+
+        self.assertTrue(
+            any("Copied schema differs" in error for error in result["errors"]),
+            result["errors"],
+        )
+
+    def test_verify_missing_executable_fails_cleanly(self) -> None:
+        self.init_memory()
+        run_id = self.begin_source_writing()
+
+        result = self.invoke(
+            "verify", "--root", self.repo, "--run", run_id,
+            "--name", "missing-command", "--",
+            "brownfield-command-that-does-not-exist-42",
+        )
+
+        self.assertEqual(2, result.returncode)
+        payload = json.loads(result.stdout)
+        self.assertIn("Cannot start verification command", payload["error"])
+        self.assertNotIn("Traceback", result.stderr)
+
 if __name__ == "__main__":
     unittest.main()

@@ -109,10 +109,7 @@ class BrownfieldError(RuntimeError):
 
 
 def _schema_root_for(path: Path | None) -> Path:
-    if path is not None:
-        for parent in path.resolve().parents:
-            if parent.name == MEMORY_NAME and (parent / "schemas").is_dir():
-                return parent / "schemas"
+    """Use the bundled writer schema as the immutable validation authority."""
     return ASSET_SCHEMA_ROOT
 
 
@@ -128,7 +125,12 @@ def _schema_errors(value: Any, schema_name: str, label: str, path: Path | None =
     try:
         schema = read_json(schema_path)
         validator = Draft202012Validator(schema, format_checker=FormatChecker())
-        issues = sorted(validator.iter_errors(value), key=lambda item: list(item.absolute_path))
+        issues = sorted(
+            validator.iter_errors(value),
+            key=lambda item: tuple(
+                f"{type(part).__name__}:{part}" for part in item.absolute_path
+            ),
+        )
     except (OSError, ValueError, TypeError) as exc:
         return [f"{label}: cannot validate against {schema_name}: {exc}"]
     errors: list[str] = []
@@ -964,6 +966,23 @@ def validate_memory(project_root: Path, strict: bool = False) -> dict[str, list[
     for relative in required:
         if not safe_child(memory, relative).exists():
             errors.append(f"Missing required file: {relative}")
+    schema_names = (
+        "manifest.schema.json", "policy.schema.json", "state.schema.json",
+        "record.schema.json", "run.schema.json", "contribution.schema.json",
+    )
+    for schema_name in schema_names:
+        copied = memory / "schemas" / schema_name
+        bundled = ASSET_SCHEMA_ROOT / schema_name
+        if not copied.is_file():
+            errors.append(f"Missing required schema: schemas/{schema_name}")
+            continue
+        try:
+            if read_json(copied) != read_json(bundled):
+                errors.append(
+                    f"Copied schema differs from bundled writer authority: schemas/{schema_name}"
+                )
+        except BrownfieldError as exc:
+            errors.append(str(exc))
     try:
         manifest = read_json(memory / "manifest.json")
         policy = read_json(memory / "policy.json")
