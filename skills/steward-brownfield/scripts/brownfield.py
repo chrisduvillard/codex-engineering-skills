@@ -6,8 +6,11 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import platform
 import re
+import signal
 import socket
+import subprocess
 import sys
 import uuid
 from contextlib import contextmanager
@@ -28,6 +31,7 @@ from brownfield_core import (
     build_context,
     canonical_json,
     changed_source_paths,
+    hash_bytes,
     hash_file,
     init_memory,
     known_stale_records,
@@ -55,6 +59,7 @@ from brownfield_core import (
 AGENT_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,79}$")
 LOCK_MINUTES = 15
 RISK_RANK = {"LOW": 0, "MODERATE": 1, "HIGH": 2}
+VERIFICATION_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,79}$")
 
 
 def reject_sensitive(label: str, value: Any) -> None:
@@ -319,7 +324,7 @@ def status_payload(root: Path) -> dict[str, Any]:
     try:
         _, manifest, _, state = load_control(root)
         snapshot = snapshot_vector(root, manifest)
-        stale = stale_records(root)
+        stale = stale_records(root, snapshot=snapshot)
     except (BrownfieldError, KeyError, TypeError, ValueError) as exc:
         validation["errors"].append(str(exc))
         return {"classification": "RECOVERY_REQUIRED", "memory": str(memory), "validation": validation}
@@ -378,8 +383,10 @@ def cmd_begin(args: argparse.Namespace) -> dict[str, Any]:
         if not safe_relative_path(path):
             raise BrownfieldError(f"Run envelope path must be a safe project-relative path: {path!r}")
     for check in args.required_check or []:
-        if not check.strip() or len(check) > 1_000:
-            raise BrownfieldError("Required check labels must contain 1 to 1000 characters")
+        if not VERIFICATION_NAME_RE.fullmatch(check):
+            raise BrownfieldError(
+                "Required checks must use 1 to 80 letters, digits, dot, underscore, or hyphen"
+            )
     for condition in args.stop_when or []:
         if not condition.strip() or len(condition) > 1_000:
             raise BrownfieldError("Stopping conditions must contain 1 to 1000 characters")
@@ -925,6 +932,101 @@ def cmd_context(args: argparse.Namespace) -> dict[str, Any] | str:
     return content
 
 
+
+def _run_verification(argv: list[str], cwd: Path, timeout_seconds: int) -> tuple[int, bytes, bytes, bool]:
+    kwargs: dict[str, Any] = {"stdout": subprocess.PIPE, "stderr": subprocess.PIPE}
+    if os.name == "nt":
+        kwargs["creationflags"] = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+    else:
+        kwargs["start_new_session"] = True
+    process = subprocess.Popen(argv, cwd=cwd, **kwargs)
+    try:
+        stdout, stderr = process.communicate(timeout=timeout_seconds)
+        return process.returncode, stdout, stderr, False
+    except subprocess.TimeoutExpired:
+        if os.name == "nt":
+            process.kill()
+        else:
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+        stdout, stderr = process.communicate()
+        return 124, stdout, stderr, True
+
+
+def cmd_verify(args: argparse.Namespace) -> dict[str, Any]:
+    root = project_root(args.root)
+    memory, manifest, _, state = load_control(root)
+    run_id, _, _ = active_run(memory, state, args.run)
+    if not VERIFICATION_NAME_RE.fullmatch(args.name):
+        raise BrownfieldError(
+            "Verification name must use 1 to 80 letters, digits, dot, underscore, or hyphen"
+        )
+    command = list(args.command)
+    if command and command[0] == "--":
+        command = command[1:]
+    if not command:
+        raise BrownfieldError("Verification requires a command after --")
+    if args.timeout < 1 or args.timeout > 86_400:
+        raise BrownfieldError("Verification timeout must be between 1 and 86400 seconds")
+    reject_sensitive("verification command", command)
+
+    before = snapshot_vector(root, manifest)
+    started_at = utc_now()
+    exit_code, stdout, stderr, timed_out = _run_verification(command, root, args.timeout)
+    finished_at = utc_now()
+    after = snapshot_vector(root, manifest)
+    source_unchanged = before["source_vector_digest"] == after["source_vector_digest"]
+    if timed_out:
+        result = "TIMEOUT"
+    elif not source_unchanged:
+        result = "STALE"
+    elif exit_code == 0:
+        result = "PASS"
+    else:
+        result = "FAIL"
+
+    environment = {
+        "python": sys.version,
+        "executable": sys.executable,
+        "platform": platform.platform(),
+        "os_name": os.name,
+    }
+    summary = args.summary or (
+        "Command passed with exit code 0" if result == "PASS"
+        else f"Command result {result} with exit code {exit_code}"
+    )
+    if not summary.strip() or len(summary) > 2_000:
+        raise BrownfieldError("Verification summary must contain 1 to 2000 characters")
+    receipt = {
+        "schema_version": SCHEMA_VERSION,
+        "name": args.name,
+        "run_id": run_id,
+        "result": result,
+        "argv": command,
+        "cwd": ".",
+        "exit_code": exit_code,
+        "started_at": started_at,
+        "finished_at": finished_at,
+        "timeout_seconds": args.timeout,
+        "timed_out": timed_out,
+        "source_snapshot": after,
+        "source_unchanged": source_unchanged,
+        "stdout_sha256": hash_bytes(stdout),
+        "stderr_sha256": hash_bytes(stderr),
+        "environment_digest": hash_bytes(canonical_json(environment).encode()),
+        "summary": summary,
+        "redaction_status": "REVIEWED",
+    }
+    reject_sensitive("verification receipt", receipt)
+    target = safe_child(memory, f"runs/{run_id}/verification/{args.name}.json")
+    with coordinator_lock(memory, run_id, reclaim=args.reclaim_lock):
+        current_state = read_json(memory / "state.json")
+        active_run(memory, current_state, run_id)
+        atomic_write_json(target, receipt)
+    return receipt
+
 def cmd_render(args: argparse.Namespace) -> dict[str, Any]:
     root = project_root(args.root)
     memory, _, _, state = load_control(root)
@@ -1006,12 +1108,16 @@ def source_envelope_violations(
 ) -> list[str]:
     """Map current source drift against the immutable run authorization envelope."""
     envelope = run.get("envelope", {})
-    if not envelope.get("source_writes_authorized"):
-        return []
     baseline = run.get("baseline", {}).get("source_snapshot")
     if not isinstance(baseline, dict):
         raise BrownfieldError("Run baseline has no valid source snapshot")
     changed = changed_source_paths(root, manifest, baseline, current)
+    if not envelope.get("source_writes_authorized"):
+        return [
+            f"{repository_id}:{relative} changed during a read-only run"
+            for repository_id, paths in sorted(changed.items())
+            for relative in paths
+        ]
     repositories = {item["id"]: item for item in manifest["repositories"]}
     allowed = envelope.get("allowed_paths", [])
     forbidden = envelope.get("forbidden_paths", [])
@@ -1069,21 +1175,29 @@ def verified_finish_snapshot(
             "Repository source changed after the final checkpoint; repeat validation and checkpoint the current snapshot"
         )
 
-    current_checks = {
-        check
-        for checkpoint in checkpoints
-        if isinstance(checkpoint, dict)
-        and isinstance(checkpoint.get("source_snapshot"), dict)
-        and checkpoint["source_snapshot"].get("source_vector_digest") == current_digest
-        for check in checkpoint.get("checks", [])
-        if isinstance(check, str)
-    }
     required_checks = run.get("envelope", {}).get("required_checks", [])
-    missing_checks = [check for check in required_checks if check not in current_checks]
+    missing_checks: list[str] = []
+    invalid_checks: list[str] = []
+    for check in required_checks:
+        receipt_path = safe_child(
+            memory_path(root), f"runs/{run['run_id']}/verification/{check}.json"
+        )
+        if not receipt_path.is_file():
+            missing_checks.append(check)
+            continue
+        receipt = read_json(receipt_path)
+        if (
+            not isinstance(receipt, dict)
+            or receipt.get("result") != "PASS"
+            or not receipt.get("source_unchanged")
+            or receipt.get("source_snapshot", {}).get("source_vector_digest") != current_digest
+        ):
+            invalid_checks.append(check)
     if missing_checks:
+        raise BrownfieldError("Required verification receipts are missing: " + ", ".join(missing_checks))
+    if invalid_checks:
         raise BrownfieldError(
-            "Required checks were not recorded against the current source snapshot: "
-            + ", ".join(missing_checks)
+            "Required verification receipts are not current PASS results: " + ", ".join(invalid_checks)
         )
 
     violations = source_envelope_violations(root, manifest, run, current)
@@ -1428,6 +1542,16 @@ def build_parser() -> argparse.ArgumentParser:
     context.add_argument("--max-chars", type=int)
     context.add_argument("--output")
     context.set_defaults(handler=cmd_context)
+
+    verify = commands.add_parser("verify", help="Run a command and persist a verification receipt")
+    add_common_root(verify)
+    verify.add_argument("--run")
+    verify.add_argument("--name", required=True)
+    verify.add_argument("--summary")
+    verify.add_argument("--timeout", type=int, default=900)
+    verify.add_argument("command", nargs=argparse.REMAINDER)
+    add_reclaim(verify)
+    verify.set_defaults(handler=cmd_verify)
 
     render = commands.add_parser("render", help="Rebuild deterministic index, freshness, and handoff views")
     add_common_root(render)

@@ -12,6 +12,8 @@ from typing import Any
 
 SKILL_ROOT = Path(__file__).resolve().parents[1]
 CLI = SKILL_ROOT / "scripts" / "brownfield.py"
+sys.path.insert(0, str(SKILL_ROOT / "scripts"))
+from brownfield_core import BrownfieldError, _source_fingerprint  # noqa: E402
 
 
 class BrownfieldCliTests(unittest.TestCase):
@@ -148,6 +150,12 @@ class BrownfieldCliTests(unittest.TestCase):
         if check:
             args.extend(["--check", check])
         return self.invoke_json(*args)
+
+    def verify(self, run_id: str, name: str, *command: str) -> dict[str, Any]:
+        return self.invoke_json(
+            "verify", "--root", self.repo, "--run", run_id,
+            "--name", name, "--", *command,
+        )
 
     def advance_source_run_to_merging(self, run_id: str, *, check: str | None = None) -> None:
         for stage in ["INVESTIGATING", "CHANGING", "VALIDATING", "REVIEWING"]:
@@ -439,7 +447,7 @@ class BrownfieldCliTests(unittest.TestCase):
             agent="context-author",
             task="large-context",
             title="Large bounded record",
-            statement="x" * 6_000,
+            statement="x" * 4_800,
         )
         self.stage(run_id, "large.json", contribution)
         self.merge(run_id, contribution["contribution_id"])
@@ -582,7 +590,8 @@ class BrownfieldCliTests(unittest.TestCase):
 
         self.assertEqual(2, result.returncode, result.stderr)
         payload = json.loads(result.stdout)
-        self.assertIn("source_snapshot must be an object", payload["error"])
+        self.assertIn("schema $.source_snapshot", payload["error"])
+        self.assertIn("not of type 'object'", payload["error"])
         self.assertNotIn("Traceback", result.stderr)
         staged = self.repo / ".brownfield" / "runs" / run_id / "contributions"
         self.assertEqual([], list(staged.glob("*.json")))
@@ -649,9 +658,11 @@ class BrownfieldCliTests(unittest.TestCase):
             summary,
             expected=2,
         )
-        self.assertIn("Required checks were not recorded", missing_check["error"])
+        self.assertIn("Required verification receipts are missing", missing_check["error"])
 
-        self.checkpoint(run_id, "MERGING", check="fixture-check")
+        receipt = self.verify(run_id, "fixture-check", sys.executable, "-c", "print('ok')")
+        self.assertEqual("PASS", receipt["result"])
+        self.checkpoint(run_id, "MERGING")
         finished = self.invoke_json(
             "finish",
             "--root",
@@ -670,7 +681,11 @@ class BrownfieldCliTests(unittest.TestCase):
             required_check="fixture-check",
         )
         (self.repo / "src" / "unrelated.txt").write_text("forbidden v2\n", encoding="utf-8")
-        self.advance_source_run_to_merging(run_id, check="fixture-check")
+        receipt = self.verify(
+            run_id, "fixture-check", sys.executable, "-c", "print('ok')"
+        )
+        self.assertEqual("PASS", receipt["result"])
+        self.advance_source_run_to_merging(run_id)
         summary = self.inputs / "forbidden-summary.md"
         summary.write_text("Checked the source-writing run.\n", encoding="utf-8")
 
@@ -715,7 +730,7 @@ class BrownfieldCliTests(unittest.TestCase):
             summary,
             expected=2,
         )
-        self.assertIn("Required checks were not recorded", finish["error"])
+        self.assertIn("Required verification receipts are missing", finish["error"])
 
         proposal = self.contribution(
             run_id,
@@ -1022,6 +1037,97 @@ class BrownfieldCliTests(unittest.TestCase):
         record = unversioned / ".brownfield" / "records" / "claims" / f"{record_id}.json"
         self.assertFalse(record.exists())
 
+
+    def test_source_glob_rejects_symlink_escape(self) -> None:
+        external = self.workspace / "external.txt"
+        external.write_text("outside\n", encoding="utf-8")
+        link = self.repo / "src" / "external-link.txt"
+        try:
+            link.symlink_to(external)
+        except (OSError, NotImplementedError):
+            self.skipTest("symlink creation is unavailable")
+        with self.assertRaises(BrownfieldError):
+            _source_fingerprint(self.repo, {"glob": "src/*.txt"})
+
+    def test_context_expands_transitive_dependencies_before_dependant(self) -> None:
+        self.init_memory()
+        run_id = self.begin_discovery()
+        contribution = self.contribution(
+            run_id, agent="context-agent", task="dependency-closure",
+            title="Root record", statement="Root depends on the middle record.",
+        )
+        root_record = contribution["operations"][0]["record"]
+        middle = self.record_template(
+            run_id, title="Middle record",
+            statement="Middle depends on the leaf record.", classification="INFERENCE",
+        )
+        leaf = self.record_template(
+            run_id, title="Leaf record",
+            statement="Leaf contains the foundational evidence.", classification="INFERENCE",
+        )
+        root_record["depends_on"]["records"] = [middle["id"]]
+        middle["depends_on"]["records"] = [leaf["id"]]
+        contribution["operations"] = [
+            {"action": "CREATE", "expected_revision": None, "record": root_record},
+            {"action": "CREATE", "expected_revision": None, "record": middle},
+            {"action": "CREATE", "expected_revision": None, "record": leaf},
+        ]
+        self.stage(run_id, "transitive-context.json", contribution)
+        self.merge(run_id, contribution["contribution_id"])
+        result = self.invoke(
+            "context", "--root", self.repo, "--mission", "Inspect dependency closure",
+            "--record", root_record["id"], "--max-chars", 20000, json_output=False,
+        )
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertLess(result.stdout.index(leaf["id"]), result.stdout.index(middle["id"]))
+        self.assertLess(result.stdout.index(middle["id"]), result.stdout.index(root_record["id"]))
+        self.assertIn("Dependency closure complete: yes", result.stdout)
+
+    def test_schema_rejects_unexpected_record_property(self) -> None:
+        self.init_memory()
+        run_id = self.begin_discovery()
+        contribution = self.contribution(
+            run_id, agent="schema-agent", task="schema-test",
+            title="Invalid record", statement="This record contains an unexpected field.",
+        )
+        contribution["operations"][0]["record"]["unexpected"] = True
+        source = self.write_input("invalid-schema.json", contribution)
+        result = self.invoke_json(
+            "stage", "--root", self.repo, "--run", run_id,
+            "--input", source, expected=2,
+        )
+        self.assertIn("Additional properties are not allowed", result["error"])
+
+    def test_read_only_run_rejects_source_drift_at_finish(self) -> None:
+        self.init_memory()
+        run_id = self.begin_discovery()
+        (self.repo / "src" / "primary.txt").write_text("changed\n", encoding="utf-8")
+        for stage in ["INVESTIGATING", "VALIDATING", "REVIEWING", "MERGING"]:
+            self.checkpoint(run_id, stage)
+        summary = self.inputs / "read-only-summary.md"
+        summary.write_text("Reviewed the repository.\n", encoding="utf-8")
+        result = self.invoke_json(
+            "finish", "--root", self.repo, "--run", run_id,
+            "--summary-file", summary, expected=2,
+        )
+        self.assertIn("changed during a read-only run", result["error"])
+
+    def test_verification_receipt_fails_closed_after_source_change(self) -> None:
+        self.init_memory()
+        run_id = self.begin_source_writing(required_check="fixture-check")
+        receipt = self.verify(run_id, "fixture-check", sys.executable, "-c", "print('ok')")
+        self.assertEqual("PASS", receipt["result"])
+        (self.repo / "src" / "primary.txt").write_text(
+            "changed after verification\n", encoding="utf-8"
+        )
+        self.advance_source_run_to_merging(run_id)
+        summary = self.inputs / "stale-receipt-summary.md"
+        summary.write_text("Attempted completion with a stale receipt.\n", encoding="utf-8")
+        result = self.invoke_json(
+            "finish", "--root", self.repo, "--run", run_id,
+            "--summary-file", summary, expected=2,
+        )
+        self.assertIn("not current PASS results", result["error"])
 
 if __name__ == "__main__":
     unittest.main()

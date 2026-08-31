@@ -1,4 +1,6 @@
 interface:
   display_name: "Checkpoint Walkthrough"
-  short_description: "Guide a human through reviewing a change"
-  default_prompt: "Use $checkpoint-walkthrough to orient me to this change, show the key concerns and risks, and help me make a review decision."
+  short_description: "Guide a bounded human review decision"
+  default_prompt: "Use $checkpoint-walkthrough to explain this change, identify high-value review stops, and prepare an approve, rework, or discuss decision."
+policy:
+  allow_implicit_invocation: false

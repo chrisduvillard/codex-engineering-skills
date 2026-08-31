@@ -1,6 +1,6 @@
 ---
 name: reasoning-codebase-review
-description: Orchestrate a read-only multi-agent review of an existing codebase using independent reasoning methods such as pre-mortem analysis, first principles, inversion, red-team versus blue-team, Socratic questioning, constraint removal, stakeholder mapping, and analogical reasoning. Use when the user explicitly invokes this skill or asks for multiple agents, parallel reviewers, an assumption challenge, architectural pressure test, or several independent reasoning perspectives on a repository. Produce evidence-backed findings, disagreements, and bounded residual risk. Do not implement fixes unless separately requested.
+description: Run a read-only, multi-perspective audit of an existing codebase using independent investigators and red/blue challenge. Use for broad architecture and risk pressure tests; not for a single narrow defect.
 ---
 
 # Reasoning Codebase Review
@@ -8,6 +8,14 @@ description: Orchestrate a read-only multi-agent review of an existing codebase 
 Pressure-test a codebase through independent reasoning lenses, then challenge the resulting claims before accepting them. Treat explicit invocation as authority to spawn read-only subagents for this review only.
 
 Do not ask agents to reveal private chain-of-thought. Ask for observable claims, questions tested, repository evidence, counterevidence, and conclusions.
+
+## Execution profiles
+
+- **Fast:** one bounded investigator and a coordinator verification pass.
+- **Standard:** two independent concern clusters plus one challenge pass.
+- **Deep:** the full investigator wave, separate red and blue challengers, and explicit residual-risk accounting.
+
+Use Deep for high-consequence or highly coupled systems, not merely large repositories.
 
 ## Operating contract
 

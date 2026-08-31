@@ -1,11 +1,19 @@
 ---
 name: evidence-retrospective
-description: Reconstruct a completed or substantially completed body of engineering work from repository evidence and turn it into sourced lessons, systemic findings, follow-through checks, and owned action items. Use when asked to run a retrospective, post-implementation review, milestone or release review, sprint or epic retro, migration review, delivery audit, or lessons-learned analysis; when several stories or agent sessions must be assessed as one whole; or when the user wants to compare what was intended, built, verified, and left unresolved. Work from specs, tickets, diffs, commits, tests, runtime observations, and prior retrospectives rather than memory. Do not implement remediation unless separately requested.
+description: Reconstruct completed engineering work from goals, diffs, tests, CI, runtime evidence, and prior commitments. Produce sourced systemic lessons and owned follow-up actions; do not implement remediation.
 ---
 
 # Evidence Retrospective
 
 Review the evidence a body of work left behind. Surface lessons no single ticket, commit, or coding session could see, then route each lesson into a concrete disposition without inventing motives or blame.
+
+## Execution profiles
+
+- **Fast:** one small completed change, two aggregate views, and at most three sourced findings.
+- **Standard:** material aggregate views plus targeted runtime verification.
+- **Deep:** independent analysts across a milestone or release, prior-action follow-through, and a verdict when declared criteria exist.
+
+Escalate for migrations, incidents, public contracts, or cross-service work even when commit count is small.
 
 ## Operating contract
 

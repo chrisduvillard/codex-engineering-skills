@@ -1,6 +1,6 @@
 ---
 name: context-pruner
-description: Audit, create, adopt, refresh, or prune repository-level AI agent instructions such as AGENTS.md, CLAUDE.md, copilot instructions, and linked rule files into a small, verified, non-duplicative context that changes agent behavior. Use when asked to clean up, shorten, consolidate, validate, generate, migrate, or update agent instructions; reduce context debt; resolve contradictory rule files; record an observed agent pitfall; decide what belongs in always-loaded versus triggered context; or verify that nested instructions are actually discovered. Preserve human-authored rules through an explicit ledger, prefer mechanical enforcement over prose, and remove instructions only with evidence or explicit approval.
+description: Audit or improve repository AI instructions such as AGENTS.md, CLAUDE.md, Copilot, or Cursor rules. Verify what loads, preserve protected behavior, reduce duplication, and prefer mechanical enforcement.
 ---
 
 # Context Pruner

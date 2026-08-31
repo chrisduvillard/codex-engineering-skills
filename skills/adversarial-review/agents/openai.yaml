@@ -2,3 +2,5 @@ interface:
   display_name: "Adversarial Review"
   short_description: "Adaptively falsify code across edge cases"
   default_prompt: "Use $adversarial-review to attack this change with adaptive edge-case tests and report reproducible defects."
+policy:
+  allow_implicit_invocation: true

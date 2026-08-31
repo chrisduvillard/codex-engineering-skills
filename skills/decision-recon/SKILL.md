@@ -1,11 +1,19 @@
 ---
 name: decision-recon
-description: Investigate consequential engineering choices and produce an evidence-backed, reversible recommendation. Use when choosing between technologies, vendors, libraries, architectures, migration paths, build-versus-buy options, or competing technical proposals; when asked to research a technical decision, compare candidates, write or validate an ADR, challenge a preferred option, or determine what evidence would settle a disputed choice. Combine repository constraints with current external research, expose uncertainty and lock-in, and identify the conditions under which the recommendation changes. Do not implement the decision unless separately requested.
+description: Research a consequential technology, vendor, architecture, migration, or build-versus-buy decision. Apply hard gates, current evidence, lifecycle cost, sensitivity, challenge, and explicit reversal conditions.
 ---
 
 # Decision Recon
 
 Turn a consequential choice into a decision whose evidence, uncertainty, and reversal conditions are visible. Optimize for a recommendation the user can inspect and re-weight, not a verdict they must trust.
+
+## Execution profiles
+
+- **Fast:** status quo plus one credible alternative, primary sources, and one decisive uncertainty.
+- **Standard:** hard-gate screen, evidence matrix, sensitivity, and a skeptic pass.
+- **Deep:** independent criterion researchers, lifecycle economics, lock-in analysis, and a bounded pilot.
+
+Choose the smallest profile that makes the decision stable under plausible re-weighting.
 
 ## Operating contract
 

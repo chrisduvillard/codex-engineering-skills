@@ -1,6 +1,6 @@
 ---
 name: steward-brownfield
-description: Build and maintain a durable, evidence-backed project world model for large or long-lived brownfield software systems, then use it to resume work, perform discovery or audits, plan changes, make bounded improvements, align implementation with documented user intent, and hand work to fresh agents. Use when engineering knowledge must persist across sessions or agents, when a repository needs systematic multi-domain analysis, or when the user requests discovery, audit, conservative fixes, improvement, vision alignment, or bounded autonomous work. Do not use for isolated small edits or ordinary point-in-time code review.
+description: Build and maintain durable, evidence-backed project memory for large or long-lived brownfield systems, then use it to resume, discover, audit, plan, improve, align intent, and hand work to fresh agents.
 ---
 
 # Steward Brownfield Projects
@@ -36,7 +36,7 @@ and dynamic specialists only where they add value.
 1. Read repository instructions, glossary/context files, ADRs, and native architecture aids before
    naming concepts or running project commands.
 2. Resolve this skill's directory and use `scripts/brownfield.py`; do not copy its logic into the
-   project. The CLI uses only the Python standard library.
+   project. Install `requirements.txt` before using the CLI; structural validation uses `jsonschema`.
 3. Run `status` before any persistent or source write:
 
    ```bash
@@ -184,6 +184,19 @@ Never infer operational authority from a source-writing mode. Deployment, public
 external messages, cloud changes, production data, and destructive actions require explicit target-
 specific authorization.
 
+Verify a required check with an executable receipt:
+
+```bash
+python3 <skill-directory>/scripts/brownfield.py verify \
+  --root <project-root> \
+  --name unit-tests \
+  --timeout 900 \
+  -- python3 -m unittest discover
+```
+
+Checkpoint `--check` values are descriptive labels only. `finish` accepts required checks only from
+current `PASS` receipts produced by `verify`.
+
 ## Checkpoint, finish, or abort
 
 Advance run stages durably: `INITIALIZED → INVESTIGATING → [CHANGING] → VALIDATING → REVIEWING →
@@ -230,6 +243,7 @@ Use `python3 <skill-directory>/scripts/brownfield.py <command> --help` for exact
 | `merge` / `reject` | Let the sole coordinator accept or durably reject a contribution. |
 | `refresh` | Report targeted staleness; use `--apply` only inside an active run. |
 | `context` | Retrieve task-scoped current knowledge within a character budget. |
+| `verify` | Execute a bounded command and persist a source-linked verification receipt. |
 | `checkpoint` | Advance exactly one permitted run stage with a concise summary. |
 | `render` | Deterministically rebuild derived index, freshness, and handoff views. |
 | `recover` | Complete an interrupted memory transaction or reconcile a closed run. |

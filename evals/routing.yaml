@@ -1,0 +1,46 @@
+schema_version: 1
+cases:
+  - id: broad-audit
+    prompt: "Audit this repository architecture and identify systemic risks."
+    expected: reasoning-codebase-review
+    excluded: [adversarial-review, trace-data-provenance]
+  - id: narrow-change-attack
+    prompt: "Try to break this parser change and give me minimal reproductions."
+    expected: adversarial-review
+    excluded: [reasoning-codebase-review]
+  - id: human-walkthrough
+    prompt: "Walk me through this pull request and tell me where I should look."
+    expected: checkpoint-walkthrough
+    excluded: [evidence-retrospective]
+  - id: completed-milestone
+    prompt: "Run a retrospective on the completed migration."
+    expected: evidence-retrospective
+    excluded: [checkpoint-walkthrough]
+  - id: one-value-lineage
+    prompt: "Trace where this dashboard score came from and where it became stale."
+    expected: trace-data-provenance
+    excluded: [reasoning-codebase-review]
+  - id: technology-choice
+    prompt: "Compare Postgres and DynamoDB and recommend a reversible choice."
+    expected: decision-recon
+    excluded: [idea-forge]
+  - id: implementation-plan
+    prompt: "Investigate this repository and create a safe execution plan for the refactor."
+    expected: deep-plan
+    excluded: [idea-forge]
+  - id: early-idea
+    prompt: "Pressure-test this product idea before we commit to planning it."
+    expected: idea-forge
+    excluded: [deep-plan]
+  - id: instruction-cleanup
+    prompt: "Audit and reduce duplication in AGENTS.md and CLAUDE.md."
+    expected: context-pruner
+    excluded: [deep-plan]
+  - id: branch-recovery
+    prompt: "Salvage useful work from this abandoned agent branch without overwriting main."
+    expected: harvest-agent-branches
+    excluded: [checkpoint-walkthrough]
+  - id: durable-memory
+    prompt: "Build durable project memory so fresh agents can resume this brownfield system."
+    expected: steward-brownfield
+    excluded: [context-pruner]
