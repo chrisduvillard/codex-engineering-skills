@@ -162,8 +162,9 @@ jobs:
       - name: Commit hardened repository
         shell: bash
         run: |
-          rm -rf .github/hardening-payload .github/workflows/apply-hardening.yml
+          rm -rf .github/hardening-payload
           rm -f scripts/apply_audit_hardening.py
+          git restore --source=HEAD -- .github/workflows/validate.yml
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -A
