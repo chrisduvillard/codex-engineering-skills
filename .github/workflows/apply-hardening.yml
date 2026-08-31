@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   apply:
-    if: github.actor != 'github-actions[bot]'
+    if: github.actor != 'github-actions[bot]]'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -34,6 +34,20 @@ jobs:
 
       - name: Apply approved changes
         run: python scripts/apply_audit_hardening.py
+
+      - name: Repair regex replacement escape semantics
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('skills/steward-brownfield/scripts/brownfield_core.py')
+          data = path.read_bytes()
+          count = data.count(b'\x00')
+          if count != 2:
+              raise SystemExit(f'Expected exactly two generated NUL bytes, found {count}')
+          path.write_bytes(data.replace(b'\x00', b'\\0'))
+          PY
 
       - name: Diagnose generated Python sources
         shell: bash
