@@ -1,13 +1,1 @@
-name: Apply approved audit hardening
-
-on:
-  workflow_dispatch:
-
-permissions:
-  contents: read
-
-jobs:
-  retired:
-    runs-on: ubuntu-24.04
-    steps:
-      - run: echo "Bootstrap retired after the hardened source commit was published."
+# Retired bootstrap. Safe to delete before merge.
