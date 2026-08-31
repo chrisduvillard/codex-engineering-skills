@@ -43,14 +43,15 @@ jobs:
 
           path = Path('skills/steward-brownfield/scripts/brownfield_core.py')
           data = path.read_bytes()
+          slash = bytes([92])
 
-          nul_count = data.count(b'\x00')
+          nul_count = data.count(bytes([0]))
           if nul_count != 2:
               raise SystemExit(f'Expected exactly two generated NUL bytes, found {nul_count}')
-          data = data.replace(b'\x00', b'\\0')
+          data = data.replace(bytes([0]), slash + b'0')
 
-          bad = b'or "\\" in pattern:'
-          good = b'or "\\\\" in pattern:'
+          bad = b'or "' + slash + b'" in pattern:'
+          good = b'or "' + slash + slash + b'" in pattern:'
           bad_count = data.count(bad)
           if bad_count != 1:
               raise SystemExit(f'Expected exactly one malformed backslash check, found {bad_count}')
