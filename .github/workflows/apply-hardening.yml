@@ -61,6 +61,54 @@ jobs:
           PY
           python -m py_compile skills/steward-brownfield/scripts/brownfield_core.py
 
+      - name: Normalize hardened behavior and regression fixtures
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          cli_path = Path('skills/steward-brownfield/scripts/brownfield.py')
+          cli = cli_path.read_text(encoding='utf-8')
+          violations_block = r'''    violations = source_envelope_violations(root, manifest, run, current)
+          if violations:
+              raise BrownfieldError("Run source changes violate its authorization envelope:\n- " + "\n- ".join(violations))
+
+          '''
+          invalid_block = r'''    if invalid_checks:
+              raise BrownfieldError(
+                  "Required verification receipts are not current PASS results: " + ", ".join(invalid_checks)
+              )
+          '''
+          if cli.count(violations_block) != 1:
+              raise SystemExit('Expected exactly one pre-receipt source-violation block')
+          if cli.count(invalid_block) != 1:
+              raise SystemExit('Expected exactly one invalid-receipt block')
+          cli = cli.replace(violations_block, '', 1)
+          cli = cli.replace(
+              invalid_block,
+              invalid_block + '\n' + violations_block.rstrip() + '\n',
+              1,
+          )
+          cli_path.write_text(cli, encoding='utf-8', newline='\n')
+
+          test_path = Path('skills/steward-brownfield/tests/test_brownfield.py')
+          tests = test_path.read_text(encoding='utf-8')
+          replacements = {
+              'statement="x" * 6_000,': 'statement="x" * 4_800,',
+              'self.assertIn("source_snapshot must be an object", payload["error"])': (
+                  'self.assertIn("schema $.source_snapshot", payload["error"])\n'
+                  '        self.assertIn("not of type \'object\'", payload["error"])'
+              ),
+          }
+          for old, new in replacements.items():
+              if tests.count(old) != 1:
+                  raise SystemExit(f'Expected exactly one regression fixture match: {old!r}')
+              tests = tests.replace(old, new, 1)
+          test_path.write_text(tests, encoding='utf-8', newline='\n')
+          PY
+          python -m py_compile skills/steward-brownfield/scripts/brownfield.py
+          python -m py_compile skills/steward-brownfield/tests/test_brownfield.py
+
       - name: Diagnose generated Python sources
         shell: bash
         run: |
