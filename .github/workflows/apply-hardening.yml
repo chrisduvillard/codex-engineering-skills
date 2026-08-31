@@ -100,6 +100,15 @@ jobs:
                   'self.assertIn("schema $.source_snapshot", payload["error"])\n'
                   '        self.assertIn("not of type \'object\'", payload["error"])'
               ),
+              '        self.advance_source_run_to_merging(run_id, check="fixture-check")\n'
+              '        summary = self.inputs / "forbidden-summary.md"': (
+                  '        receipt = self.verify(\n'
+                  '            run_id, "fixture-check", sys.executable, "-c", "print(\'ok\')"\n'
+                  '        )\n'
+                  '        self.assertEqual("PASS", receipt["result"])\n'
+                  '        self.advance_source_run_to_merging(run_id)\n'
+                  '        summary = self.inputs / "forbidden-summary.md"'
+              ),
           }
           for old, new in replacements.items():
               if tests.count(old) != 1:
