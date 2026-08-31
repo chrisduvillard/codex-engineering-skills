@@ -1,6 +1,6 @@
 ---
 name: trace-data-provenance
-description: Trace a datum, field, metric, score, signal, or report value end to end across external sources, ingestion, normalization, storage, derivation, and delivery, with evidence for identity, time semantics, units, missingness, fallbacks, lineage, and historical behavior. Use when asked where a value came from, why data is wrong, stale, missing, duplicated, or inconsistent, whether a data contract or backfill preserves meaning, where two outputs diverge, to audit pipeline lineage, or to repair a proven provenance defect. Default to read-only tracing unless the user explicitly asks for a fix.
+description: Trace one datum, field, metric, score, or signal across source, ingestion, normalization, storage, derivation, and delivery. Diagnose the earliest boundary where identity, time, units, missingness, or lineage breaks.
 ---
 
 # Trace Data Provenance

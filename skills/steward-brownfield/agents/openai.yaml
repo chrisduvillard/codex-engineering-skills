@@ -1,4 +1,6 @@
 interface:
   display_name: "Brownfield Steward"
-  short_description: "Persist and improve evolving codebases"
-  default_prompt: "Use $steward-brownfield to resume this project safely, refresh its persistent model, and recommend the next highest-value step."
+  short_description: "Maintain durable evidence-backed project memory"
+  default_prompt: "Use $steward-brownfield to initialize or resume durable project memory and perform the requested bounded brownfield workflow."
+policy:
+  allow_implicit_invocation: false

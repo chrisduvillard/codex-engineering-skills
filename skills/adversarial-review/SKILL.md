@@ -1,11 +1,19 @@
 ---
 name: adversarial-review
-description: Falsify behavioral and security correctness by deriving attack surfaces from actual code, contracts, types, predicates, state transitions, callers, and fixed-point diffs, then adaptively executing boundary, property, metamorphic, differential, stateful, fault-injection, fuzz, concurrency, sanitizer, and selective mutation tests. Use for adversarial or red-team review of a PR, branch, diff, commit, file, function, parser, workflow, API, or bug fix; for stress-testing edge cases beyond the existing suite; or for assessing whether tests meaningfully defend changed behavior. Produce minimized reproducible findings and explicit bounded residual risk. Do not use for style-only review or to implement fixes unless separately requested.
+description: Falsify a code change with evidence-backed edge-case, state, failure, concurrency, resource, and security attacks. Use for bounded correctness or security testing of a change; not for a broad architecture audit.
 ---
 
 # Adversarial Review
 
 Try to falsify the code's claimed behavior. Treat existing tests, static warnings, and coverage as evidence that guides attacks, never as proof of correctness.
+
+## Execution profiles
+
+- **Fast:** one focused attack ledger, one safe technique, and one minimization pass.
+- **Standard:** adaptive attacks across material partitions plus reproduction and counterevidence.
+- **Deep:** multiple techniques, platform or concurrency checks, and independent challenge for authentication, money, migrations, destructive effects, or public contracts.
+
+Choose by consequence and uncertainty rather than diff size alone.
 
 ## Operating contract
 

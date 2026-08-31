@@ -1,6 +1,6 @@
 ---
 name: harvest-agent-branches
-description: Safely inspect, compare, salvage, selectively port, and split coherent work from stale, divergent, or oversized Codex, Claude, or other agent branches, abandoned worktrees, closed PRs, and recovery refs onto a current target without overwriting newer changes. Use when asked to harvest, rescue, recover, compare, selectively cherry-pick, turn a large agent branch into reviewable slices, or preserve or delete branches after salvage. Also use before wholesale-merging an old agent branch with substantial target-side changes.
+description: Inspect and recover coherent work from stale, divergent, abandoned, or oversized agent branches and worktrees without overwriting newer target changes. Use before a risky wholesale merge.
 ---
 
 # Harvest Agent Branches
@@ -18,7 +18,6 @@ Treat an agent branch as evidence about intended changes, not as a patch that de
 
 Read repository instructions, glossary or context files, ADRs, architecture notes, current plans, and available architecture indexes before classifying changes. Use the repository's vocabulary and preserve its accepted decisions.
 
-For `trading-intel`, read `AGENTS.md` and `CONTEXT.md` first, inspect relevant files in `docs/adr/`, and use scoped Graphify queries when `graphify-out/graph.json` exists. Verify graph conclusions against current source.
 
 ## Pin the evidence
 
@@ -114,7 +113,6 @@ Select additional proof by risk:
 - Run contract, golden, architecture-boundary, and end-to-end tests for cross-cutting owners.
 - Inspect integrated-target CI after landing when remote publication is authorized; a green source PR does not prove the combined target.
 
-For `trading-intel`, run focused tests first and `uv run check` before completing substantive code changes. Use Linux verification for retrieval/publication or `/proc` and spawn-lock paths, and the PostgreSQL smoke for database-sensitive behavior. Run `graphify update .` once at the end only when the graph exists and code changed.
 
 ## Preserve recovery before cleanup
 

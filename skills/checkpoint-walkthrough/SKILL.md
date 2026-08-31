@@ -1,11 +1,19 @@
 ---
 name: checkpoint-walkthrough
-description: Guide a human through reviewing a code change from intent and orientation to concern-grouped code stops, blast-radius risk prompts, observable behavior, and an explicit approve, rework, or discuss decision. Use when the user asks for a checkpoint, human review, review trail, guided walkthrough, “walk me through this change,” “what should I look at,” “show me how to test this,” or help understanding a PR, branch, commit, diff, patch, feature, or agent-produced change before making a call. Keep review evidence clickable and distinguish design questions from verified defects. Do not edit, approve, merge, publish, or otherwise act on the decision unless separately requested.
+description: Guide a human through a PR, commit, branch, or working-tree change using concern-grouped review stops, risk prompts, observable checks, and an explicit decision. Read-only; not a correctness audit by default.
 ---
 
 # Checkpoint Walkthrough
 
 Turn a change into a review path a human can follow. Orient first, group by design concern rather than file, surface the highest-blast-radius questions, offer ways to observe behavior, and preserve the user's decision authority.
+
+## Execution profiles
+
+- **Fast:** compact orientation, two concerns, and the highest-value observation.
+- **Standard:** concern trail, material risk prompts, observations, and decision packet.
+- **Deep:** interactive walkthrough with bounded correctness dives into selected high-blast-radius areas.
+
+Risk and reviewer needs determine depth; path and line counts are orientation signals only.
 
 ## Operating contract
 

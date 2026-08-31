@@ -1,0 +1,74 @@
+schema_version: 1
+description_budget: 5000
+skills:
+  adversarial-review:
+    description: "Falsify a code change with evidence-backed edge-case, state, failure, concurrency, resource, and security attacks. Use for bounded correctness or security testing of a change; not for a broad architecture audit."
+    primary_route: "bounded change falsification"
+    default_profile: "standard"
+    authority: "read-only"
+    allow_implicit_invocation: true
+  checkpoint-walkthrough:
+    description: "Guide a human through a PR, commit, branch, or working-tree change using concern-grouped review stops, risk prompts, observable checks, and an explicit decision. Read-only; not a correctness audit by default."
+    primary_route: "human review walkthrough"
+    default_profile: "standard"
+    authority: "read-only"
+    allow_implicit_invocation: false
+  context-pruner:
+    description: "Audit or improve repository AI instructions such as AGENTS.md, CLAUDE.md, Copilot, or Cursor rules. Verify what loads, preserve protected behavior, reduce duplication, and prefer mechanical enforcement."
+    primary_route: "repository instruction governance"
+    default_profile: "standard"
+    authority: "scoped edits"
+    allow_implicit_invocation: false
+  decision-recon:
+    description: "Research a consequential technology, vendor, architecture, migration, or build-versus-buy decision. Apply hard gates, current evidence, lifecycle cost, sensitivity, challenge, and explicit reversal conditions."
+    primary_route: "consequential engineering choice"
+    default_profile: "standard"
+    authority: "read-only"
+    allow_implicit_invocation: false
+  deep-plan:
+    description: "Investigate a repository and turn a broad or uncertain engineering request into a risk-ordered, executable plan with self-contained prompts and exact verification. Not for a small, fully specified edit."
+    primary_route: "broad or uncertain implementation planning"
+    default_profile: "standard"
+    authority: "planning artifacts"
+    allow_implicit_invocation: false
+  evidence-retrospective:
+    description: "Reconstruct completed engineering work from goals, diffs, tests, CI, runtime evidence, and prior commitments. Produce sourced systemic lessons and owned follow-up actions; do not implement remediation."
+    primary_route: "completed-work retrospective"
+    default_profile: "standard"
+    authority: "read-only"
+    allow_implicit_invocation: false
+  harvest-agent-branches:
+    description: "Inspect and recover coherent work from stale, divergent, abandoned, or oversized agent branches and worktrees without overwriting newer target changes. Use before a risky wholesale merge."
+    primary_route: "divergent branch recovery"
+    default_profile: "standard"
+    authority: "scoped branch edits"
+    allow_implicit_invocation: false
+  idea-forge:
+    description: "Pressure-test an early product, architecture, workflow, business, or feature idea before planning. Clarify actors and value, attack and defend assumptions, design discriminating tests, and render an honest outcome."
+    primary_route: "early idea pressure test"
+    default_profile: "standard"
+    authority: "read-only"
+    allow_implicit_invocation: false
+  reasoning-codebase-review:
+    description: "Run a read-only, multi-perspective audit of an existing codebase using independent investigators and red/blue challenge. Use for broad architecture and risk pressure tests; not for a single narrow defect."
+    primary_route: "broad codebase audit"
+    default_profile: "deep"
+    authority: "read-only"
+    allow_implicit_invocation: false
+  steward-brownfield:
+    description: "Build and maintain durable, evidence-backed project memory for large or long-lived brownfield systems, then use it to resume, discover, audit, plan, improve, align intent, and hand work to fresh agents."
+    primary_route: "durable brownfield continuity"
+    default_profile: "deep"
+    authority: "memory plus scoped source edits"
+    allow_implicit_invocation: false
+  trace-data-provenance:
+    description: "Trace one datum, field, metric, score, or signal across source, ingestion, normalization, storage, derivation, and delivery. Diagnose the earliest boundary where identity, time, units, missingness, or lineage breaks."
+    primary_route: "single-value data lineage"
+    default_profile: "standard"
+    authority: "read-only by default"
+    allow_implicit_invocation: true
+composition:
+  - [idea-forge, decision-recon, deep-plan]
+  - [deep-plan, adversarial-review, checkpoint-walkthrough]
+  - [evidence-retrospective, deep-plan]
+  - [steward-brownfield, reasoning-codebase-review]

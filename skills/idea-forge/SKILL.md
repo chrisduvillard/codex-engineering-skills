@@ -1,6 +1,6 @@
 ---
 name: idea-forge
-description: Pressure-test a half-formed product, feature, architecture, workflow, business, or engineering idea while changing direction is still cheap. Use when the user asks to forge, challenge, attack, defend, stress-test, clarify, improve, validate, de-risk, or decide whether to pursue an idea; when a proposal contains fuzzy actors, weak assumptions, hidden stakeholders, uncertain value, feasibility, adoption, incentives, or failure modes; or before turning an idea into a specification or plan. Lead with one consequential question at a time, alternate attack and strongest-case defense, inspect existing project evidence when relevant, and finish with a hardened, clarified, parked, or killed outcome. Do not implement or plan the idea unless separately requested.
+description: Pressure-test an early product, architecture, workflow, business, or feature idea before planning. Clarify actors and value, attack and defend assumptions, design discriminating tests, and render an honest outcome.
 ---
 
 # Idea Forge

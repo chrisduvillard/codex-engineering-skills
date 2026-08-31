@@ -1,105 +1,87 @@
 ---
 name: deep-plan
-description: Turn a rough or vague engineering request into a risk-ordered plan with self-contained sub-prompts. Use when the user asks to plan, scope, audit, clean up, refactor, or organize a codebase, or when a request is broad enough that jumping straight to code would produce an unreviewable diff. Do not use for small, well-specified single-file edits.
+description: Investigate a repository and turn a broad or uncertain engineering request into a risk-ordered, executable plan with self-contained prompts and exact verification. Not for a small, fully specified edit.
 ---
 
-# Role
+# Deep Plan
 
-You are a senior engineer turning a rough request into an executable plan for
-someone who can specify precisely but cannot review code deeply. Your output is
-a PLAN DOCUMENT — English, not code.
+Turn uncertain engineering work into a plan a fresh agent can execute without silently expanding
+scope. Investigate first, order by risk, and preserve one coordinator-owned progress record.
 
-Treat the user's request in this conversation as the input to plan against.
+## Operating contract
 
----
+- Do not implement product code while planning.
+- Source files remain unchanged. Planning may write only the namespaced artifacts below.
+- Read repository instructions, architecture, tests, schemas, CI, and neighboring conventions first.
+- Preserve dirty work. Never stash, reset, clean, stage, or absorb unrelated changes.
+- Separate repository facts, user decisions, assumptions, inferences, and open questions.
+- Do not manufacture phases or cleanup work.
 
-# Hard constraints
+## Execution profiles
 
-- Write NO implementation code. Modify no file except the plan itself.
-- Investigate this repository first. A plan written from the request alone is
-  worthless — every phase must reference real files, routes, tables.
-- Do not flatter the request. If it's the wrong thing, the ordering is
-  backwards, or it's several projects at once, say so first.
+Choose by consequence and uncertainty, not line count alone.
 
-# Step 1 — Investigate, then size it
+- **Fast:** one low-risk concern with an obvious contract. Return one prompt and verification inline.
+- **Standard:** several coupled files or one material boundary. Create two to four phases.
+- **Deep:** authentication, money, migrations, destructive operations, concurrency, public contracts,
+  infrastructure, or interacting systems. Add explicit decisions, characterization, independent
+  verification, and rollback gates.
 
-Read the codebase: framework and versions, how it's run and tested, what the
-request touches, what already partly solves it, what conventions neighbouring
-code follows. Check AGENTS.md if present. Report findings in ~10 lines.
+Escalate a small high-risk change. Do not inflate a large mechanical change.
 
-Then classify — and MATCH THE PLAN TO THE SIZE. Do not inflate:
+## Investigate and frame
 
-- **Small** (one concern, <150 lines, no data or money touched) → skip phases
-  entirely. Give one sub-prompt and its verification command. Stop.
-- **Medium** (a few files, no schema or payment changes) → 2–3 phases.
-- **Large** (schema changes, auth, payments, external APIs, or cross-cutting
-  refactor) → full treatment below.
+Establish repository root, revision, branch, dirty state, applicable instructions, intended observable
+outcome, acceptance sources, entry points, affected components and contracts, existing partial
+solutions, project-native checks, and material ambiguity. Discover repository facts yourself. Ask only
+for a user decision that can materially change the plan.
 
-If the request is too vague to size, ask up to 5 questions and stop.
+## Build the risk-ordered plan
 
-# Step 2 — Interrogate the request
+Order work as applicable:
 
-- **Goal restated** in one sentence — what "done" looks like, observably.
-- **Blast radius** — does this touch live user data, auth, or payments? Is it
-  reversible? If you can't tell whether this is production, ASK.
-- **Ambiguities** — every underspecified point. Don't resolve silently.
-- **Assumptions** — marked so they can be corrected.
-- **Missing pieces** — what the request omits but needs: auth, error handling,
-  migrations, tests, secrets, rate limits, cost, edge cases, who's affected.
-  This is the highest-value part of the output.
-- **Scope split** — if this is several projects, name the first one and defer
-  the rest. Prefer deferring.
+1. baseline and reproduce current behavior;
+2. settle product, compatibility, data, security, and operational decisions;
+3. add characterization or contract tests around the changing boundary;
+4. implement the smallest coherent root-cause slice;
+5. verify focused behavior and adjacent regressions;
+6. independently challenge material-risk work;
+7. update documentation, migration, rollout, and rollback surfaces;
+8. perform optional cleanup last.
 
-# Step 3 — Phases
+Each phase states its goal, ordering reason, preconditions, dependencies, allowed and forbidden paths,
+self-contained prompts, exact checks and expected results, recovery, user decisions, and stopping
+conditions.
 
-Order by RISK, not tidiness: baseline and breakage detection → correctness and
-security → characterization tests around what's about to change → the change
-itself, in slices → structure and naming last.
+## Prompt contract
 
-Each phase:
+Every implementation prompt includes one observable concern, exact path authority, requirements,
+revision, examples to imitate, `[read-only]` or `[writes code]`, edge and failure behavior, focused and
+broader checks, evidence to capture, rollback, zero-caller proof before deletion, and a stop rule when
+the premise or authority fails. Split by independent reviewability, verification, and reversibility,
+not a universal line-count limit.
 
-- **Goal**, one sentence, and why it precedes the next
-- **Preconditions** — clean git tree, plus what must be true from prior phases
-- **Sub-prompts** (below)
-- **Verification** — the exact command and expected output proving it's done.
-  Not "it works." If it can't be checked mechanically, say what to click through.
-- **Rollback** — only for phases that write. Omit for read-only phases rather
-  than writing filler.
-- **Decisions the user must make** — anything needing judgement you shouldn't
-  make alone. Options plus your recommendation.
+## Namespaced artifacts
 
-# Sub-prompt requirements
+Standard and Deep plans create:
 
-Each is pasted into a FRESH session knowing nothing about this plan, so each
-must be self-contained and state:
+```text
+.agents/runs/deep-plan/<run-id>/
+├── PLAN.md
+├── progress.jsonl
+├── evidence.json
+└── prompts/
+```
 
-- The single concern it covers — one only
-- Which files it may touch; that it must stop and report rather than touch
-  anything else
-- Which existing file to imitate for conventions
-- `[read-only]` or `[writes code]` — front-load the read-only ones, and for
-  read-only ones note that Codex should be run in a read-only sandbox
-- That it produces a plan before code, if it writes
-- That existing tests must pass UNMODIFIED; a failing test is reported, never
-  edited
-- For deletions: show search evidence of zero callers first
-- Expected diff size; split anything over ~150 lines
-- **Ending instruction**: append a line to `PROGRESS.md` recording what was
-  done, what was verified, and anything discovered that contradicts the plan
-- **Stop condition**: if the premise of this sub-prompt turns out to be false,
-  do not improvise a fix — write the finding to `PROGRESS.md` and stop, so the
-  plan can be revised
+Use a collision-resistant UTC run ID. Never overwrite a previous run or root-level `PLAN.md`. Only the
+coordinator updates `PLAN.md` and appends canonical `progress.jsonl` events. Parallel workers return
+structured events or write agent-specific files; they never append concurrently to one shared file.
 
-Number them so they can be referred to later.
+A progress event records timestamp, phase, status, bounded summary, exact checks, contradictions, and
+the next safe action.
 
-# Step 4 — Close with
+## Close
 
-- **What could go wrong** — the 3 likeliest failure modes of this plan
-- **Where you're least confident** — what you'd want verified before trusting
-  your own analysis
-- **What NOT to do** — tempting adjacent work to leave alone
-
-# Output
-
-Write to `PLAN.md` and create an empty `PROGRESS.md` — **Medium and Large only**.
-For Small, output the sub-prompt inline and create no files.
+End with the recommended first phase, credible failure modes, weakest evidence, excluded adjacent
+work, user-owned decisions, completion and abort criteria, and the exact artifact path. The plan does
+not authorize implementation, publication, deployment, destructive actions, or external messages.

@@ -1,0 +1,6 @@
+interface:
+  display_name: "Deep Plan"
+  short_description: "Turn uncertain work into an executable plan"
+  default_prompt: "Use $deep-plan to investigate this repository and produce a risk-ordered execution plan with self-contained prompts and exact verification."
+policy:
+  allow_implicit_invocation: false

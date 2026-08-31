@@ -7,6 +7,9 @@ import hashlib
 import json
 import os
 import re
+import shutil
+import signal
+import stat
 import subprocess
 import tempfile
 import uuid
@@ -79,6 +82,8 @@ RUN_STAGES = [
 PRIMARY_EVIDENCE = {"CODE", "TEST", "RUNTIME", "USER_EVENT", "DECISION", "EXTERNAL"}
 SOURCE_EVIDENCE = {"CODE", "TEST", "DOC", "CONFIG", "SCHEMA", "FILE"}
 MAX_JSON_DEPTH = 20
+GIT_TIMEOUT_SECONDS = 30
+ASSET_SCHEMA_ROOT = Path(__file__).resolve().parent.parent / "assets" / "memory-v1" / "schemas"
 SECRET_PATTERNS = [
     re.compile(r"AKIA[0-9A-Z]{16}"),
     re.compile(r"gh[pousr]_[A-Za-z0-9]{20,}"),
@@ -101,6 +106,40 @@ SEMVER_RE = re.compile(r"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:[-
 
 class BrownfieldError(RuntimeError):
     """Raised for safe, user-actionable memory errors."""
+
+
+def _schema_root_for(path: Path | None) -> Path:
+    """Use the bundled writer schema as the immutable validation authority."""
+    return ASSET_SCHEMA_ROOT
+
+
+def _schema_errors(value: Any, schema_name: str, label: str, path: Path | None = None) -> list[str]:
+    try:
+        from jsonschema import Draft202012Validator, FormatChecker
+    except ImportError:
+        return [
+            f"{label}: jsonschema is required for structural validation; "
+            "install skills/steward-brownfield/requirements.txt"
+        ]
+    schema_path = _schema_root_for(path) / schema_name
+    try:
+        schema = read_json(schema_path)
+        validator = Draft202012Validator(schema, format_checker=FormatChecker())
+        issues = sorted(
+            validator.iter_errors(value),
+            key=lambda item: tuple(
+                f"{type(part).__name__}:{part}" for part in item.absolute_path
+            ),
+        )
+    except (OSError, ValueError, TypeError) as exc:
+        return [f"{label}: cannot validate against {schema_name}: {exc}"]
+    errors: list[str] = []
+    for issue in issues:
+        location = "$" + "".join(
+            f"[{item}]" if isinstance(item, int) else f".{item}" for item in issue.absolute_path
+        )
+        errors.append(f"{label}: schema {location}: {issue.message}")
+    return errors
 
 
 def utc_now() -> str:
@@ -204,13 +243,66 @@ def safe_child(base: Path, relative: str) -> Path:
     return resolved
 
 
+def _is_reparse_point(path: Path) -> bool:
+    try:
+        value = path.lstat()
+    except OSError:
+        return False
+    attributes = getattr(value, "st_file_attributes", 0)
+    flag = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0)
+    return bool(flag and attributes & flag)
+
+
+def _confined_regular_file(repo_root: Path, candidate: Path) -> Path:
+    root = repo_root.resolve(strict=True)
+    lexical = candidate if candidate.is_absolute() else repo_root / candidate
+    try:
+        relative = lexical.relative_to(repo_root)
+    except ValueError as exc:
+        raise BrownfieldError(f"Source path is outside repository root: {candidate}") from exc
+    cursor = repo_root
+    for part in relative.parts:
+        cursor = cursor / part
+        if cursor.is_symlink() or _is_reparse_point(cursor):
+            raise BrownfieldError(f"Source path crosses a link or reparse point: {relative.as_posix()}")
+    try:
+        resolved = lexical.resolve(strict=True)
+        resolved.relative_to(root)
+    except (OSError, ValueError) as exc:
+        raise BrownfieldError(
+            f"Source path is missing or escapes repository root: {relative.as_posix()}"
+        ) from exc
+    try:
+        mode = resolved.stat().st_mode
+    except OSError as exc:
+        raise BrownfieldError(f"Cannot inspect source path {relative.as_posix()}: {exc}") from exc
+    if not stat.S_ISREG(mode):
+        raise BrownfieldError(f"Source selector matched a non-regular file: {relative.as_posix()}")
+    return resolved
+
+
 def _run_git(repo: Path, args: list[str]) -> subprocess.CompletedProcess[bytes]:
-    return subprocess.run(
-        ["git", "-C", str(repo), *args],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        check=False,
-    )
+    command = ["git", "-C", str(repo), *args]
+    kwargs: dict[str, Any] = {"stdout": subprocess.PIPE, "stderr": subprocess.PIPE}
+    if os.name == "nt":
+        kwargs["creationflags"] = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+    else:
+        kwargs["start_new_session"] = True
+    process = subprocess.Popen(command, **kwargs)
+    try:
+        stdout, stderr = process.communicate(timeout=GIT_TIMEOUT_SECONDS)
+        return subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
+    except subprocess.TimeoutExpired:
+        if os.name == "nt":
+            process.kill()
+        else:
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+        stdout, stderr = process.communicate()
+        message = f"git command timed out after {GIT_TIMEOUT_SECONDS}s".encode()
+        return subprocess.CompletedProcess(command, 124, stdout, stderr + b"\n" + message)
 
 
 def _git_text(repo: Path, args: list[str]) -> str | None:
@@ -234,7 +326,11 @@ def _is_memory_path(path: str, repo_root: Path, project_root: Path) -> bool:
     normalized = path.replace("\\", "/")
     while normalized.startswith("./"):
         normalized = normalized[2:]
-    return normalized == MEMORY_NAME or normalized.startswith(f"{MEMORY_NAME}/")
+    return (
+        normalized == MEMORY_NAME
+        or normalized.startswith(f"{MEMORY_NAME}/")
+        or normalized.startswith(f"{MEMORY_NAME}.init-")
+    )
 
 
 def repository_snapshot(project_root: Path, repository: dict[str, Any]) -> dict[str, Any]:
@@ -440,7 +536,11 @@ def load_records(memory: Path) -> dict[str, tuple[Path, dict[str, Any]]]:
             value = read_json(path)
             record_id = value.get("id") if isinstance(value, dict) else None
             if isinstance(record_id, str):
-                records.setdefault(record_id, (path, value))
+                if record_id in records:
+                    raise BrownfieldError(
+                        f"Duplicate record ID {record_id}: {records[record_id][0]} and {path}"
+                    )
+                records[record_id] = (path, value)
     return records
 
 
@@ -497,6 +597,7 @@ def validate_record(record: Any, path: Path | None = None, strict: bool = False)
     warnings: list[str] = []
     if not isinstance(record, dict):
         return [f"{label}: must be a JSON object"], warnings
+    errors.extend(_schema_errors(record, "record.schema.json", label, path))
     required = {
         "schema_version", "id", "record_type", "record_revision", "classification", "title",
         "statement", "knowledge_status", "workflow_status", "confidence", "scope", "sensitivity",
@@ -584,13 +685,14 @@ def validate_contribution(value: Any, path: Path | None = None) -> tuple[list[st
     label = str(path) if path else "contribution"
     if not isinstance(value, dict):
         return [f"{label}: must be a JSON object"], []
+    errors = _schema_errors(value, "contribution.schema.json", label, path)
     required = {
         "schema_version", "contribution_id", "run_id", "agent_id", "task_id",
         "base_memory_revision", "base_knowledge_digest", "base_record_revisions",
         "created_at", "source_snapshot", "operations", "checks", "uncertainties",
         "risk", "review", "sensitivity_review",
     }
-    errors = _required_keys(value, required, label)
+    errors.extend(_required_keys(value, required, label))
     warnings: list[str] = []
     if errors:
         return errors, warnings
@@ -663,6 +765,71 @@ def validate_contribution(value: Any, path: Path | None = None) -> tuple[list[st
                 errors.append(f"{label}: source_change_ref changed_paths must be safe relative paths")
     return errors, warnings
 
+
+
+def validate_verification_receipt(value: Any, path: Path | None = None) -> list[str]:
+    label = str(path) if path else "verification receipt"
+    if not isinstance(value, dict):
+        return [f"{label}: must be a JSON object"]
+    required = {
+        "schema_version", "name", "run_id", "result", "argv", "cwd", "exit_code",
+        "started_at", "finished_at", "timeout_seconds", "timed_out", "source_snapshot",
+        "source_unchanged", "stdout_sha256", "stderr_sha256", "environment_digest",
+        "summary", "redaction_status",
+    }
+    errors = _required_keys(value, required, label)
+    if errors:
+        return errors
+    if set(value) != required:
+        errors.append(f"{label}: contains unexpected properties")
+    if value.get("schema_version") != SCHEMA_VERSION:
+        errors.append(f"{label}: unsupported schema_version")
+    if not isinstance(value.get("name"), str) or not re.fullmatch(
+        r"[A-Za-z0-9][A-Za-z0-9_.-]{0,79}", value["name"]
+    ):
+        errors.append(f"{label}: invalid verification name")
+    if not isinstance(value.get("run_id"), str) or not ID_RE.fullmatch(value["run_id"]):
+        errors.append(f"{label}: invalid run_id")
+    if value.get("result") not in {"PASS", "FAIL", "STALE", "TIMEOUT"}:
+        errors.append(f"{label}: invalid result")
+    if not isinstance(value.get("argv"), list) or not value["argv"] or not all(
+        isinstance(item, str) and item for item in value["argv"]
+    ):
+        errors.append(f"{label}: argv must be a non-empty string list")
+    if value.get("cwd") != ".":
+        errors.append(f"{label}: cwd must be '.'")
+    if type(value.get("exit_code")) is not int:
+        errors.append(f"{label}: exit_code must be an integer")
+    if type(value.get("timeout_seconds")) is not int or value["timeout_seconds"] < 1:
+        errors.append(f"{label}: timeout_seconds must be positive")
+    if not isinstance(value.get("timed_out"), bool) or not isinstance(
+        value.get("source_unchanged"), bool
+    ):
+        errors.append(f"{label}: timed_out and source_unchanged must be booleans")
+    for field in ("started_at", "finished_at"):
+        try:
+            parsed = datetime.fromisoformat(str(value.get(field, "")).replace("Z", "+00:00"))
+            if parsed.tzinfo is None:
+                raise ValueError
+        except ValueError:
+            errors.append(f"{label}: invalid {field}")
+    snapshot = value.get("source_snapshot")
+    if not isinstance(snapshot, dict):
+        errors.append(f"{label}: source_snapshot must be an object")
+    else:
+        for field in ("vector_digest", "source_vector_digest"):
+            digest = snapshot.get(field)
+            if not isinstance(digest, str) or not re.fullmatch(r"[a-f0-9]{64}", digest):
+                errors.append(f"{label}: invalid source_snapshot {field}")
+    for field in ("stdout_sha256", "stderr_sha256", "environment_digest"):
+        digest = value.get(field)
+        if not isinstance(digest, str) or not re.fullmatch(r"[a-f0-9]{64}", digest):
+            errors.append(f"{label}: invalid {field}")
+    if not isinstance(value.get("summary"), str) or not value["summary"] or len(value["summary"]) > 2000:
+        errors.append(f"{label}: summary must contain 1 to 2000 characters")
+    if value.get("redaction_status") not in {"NOT_APPLICABLE", "REVIEWED", "REDACTED"}:
+        errors.append(f"{label}: invalid redaction_status")
+    return errors
 
 def _scan_secrets(path: Path, content: str) -> list[str]:
     findings: list[str] = []
@@ -799,6 +966,23 @@ def validate_memory(project_root: Path, strict: bool = False) -> dict[str, list[
     for relative in required:
         if not safe_child(memory, relative).exists():
             errors.append(f"Missing required file: {relative}")
+    schema_names = (
+        "manifest.schema.json", "policy.schema.json", "state.schema.json",
+        "record.schema.json", "run.schema.json", "contribution.schema.json",
+    )
+    for schema_name in schema_names:
+        copied = memory / "schemas" / schema_name
+        bundled = ASSET_SCHEMA_ROOT / schema_name
+        if not copied.is_file():
+            errors.append(f"Missing required schema: schemas/{schema_name}")
+            continue
+        try:
+            if read_json(copied) != read_json(bundled):
+                errors.append(
+                    f"Copied schema differs from bundled writer authority: schemas/{schema_name}"
+                )
+        except BrownfieldError as exc:
+            errors.append(str(exc))
     try:
         manifest = read_json(memory / "manifest.json")
         policy = read_json(memory / "policy.json")
@@ -808,6 +992,12 @@ def validate_memory(project_root: Path, strict: bool = False) -> dict[str, list[
     for label, value in (("manifest", manifest), ("policy", policy), ("state", state)):
         if not isinstance(value, dict):
             errors.append(f"{label}.json must contain a JSON object")
+    for label, value, schema_name in (
+        ("manifest.json", manifest, "manifest.schema.json"),
+        ("policy.json", policy, "policy.schema.json"),
+        ("state.json", state, "state.schema.json"),
+    ):
+        errors.extend(_schema_errors(value, schema_name, label, memory / "schemas" / schema_name))
     if errors:
         return {"errors": sorted(set(errors)), "warnings": warnings}
     if manifest.get("schema_version") != SCHEMA_VERSION:
@@ -961,6 +1151,7 @@ def validate_memory(project_root: Path, strict: bool = False) -> dict[str, list[
             if not isinstance(run, dict):
                 errors.append(f"{run_path}: run must be a JSON object")
                 continue
+            errors.extend(_schema_errors(run, "run.schema.json", str(run_path), run_path))
             run_required = {
                 "schema_version", "run_id", "status", "stage", "mode", "objective", "scope",
                 "coordinator", "created_at", "updated_at", "base_memory_revision",
@@ -1018,6 +1209,20 @@ def validate_memory(project_root: Path, strict: bool = False) -> dict[str, list[
                             errors.append(f"Duplicate contribution ID {contribution_id}: {seen_contributions[contribution_id]} and {path}")
                         else:
                             seen_contributions[contribution_id] = path
+    if runs_root.exists():
+        for run_root in sorted(path for path in runs_root.iterdir() if path.is_dir()):
+            verification_root = run_root / "verification"
+            if not verification_root.exists():
+                continue
+            for receipt_path in sorted(verification_root.glob("*.json")):
+                try:
+                    receipt = read_json(receipt_path)
+                except BrownfieldError as exc:
+                    errors.append(str(exc))
+                    continue
+                errors.extend(validate_verification_receipt(receipt, receipt_path))
+                if isinstance(receipt, dict) and receipt.get("run_id") != run_root.name:
+                    errors.append(f"{receipt_path}: run_id does not match its directory")
     active = state.get("active_run_id")
     if active and not safe_child(memory, f"runs/{active}/run.json").exists():
         errors.append(f"state references missing active run {active}")
@@ -1057,29 +1262,39 @@ def _source_fingerprint(repo_root: Path, selector: dict[str, Any]) -> str | None
     relative = selector.get("path")
     pattern = selector.get("glob")
     if relative:
-        target = safe_child(repo_root, relative)
-        return hash_file(target) if target.is_file() else None
+        lexical = repo_root / relative
+        if not lexical.exists() and not lexical.is_symlink():
+            return None
+        return hash_file(_confined_regular_file(repo_root, lexical))
     if pattern:
-        if Path(pattern).is_absolute() or ".." in Path(pattern).parts:
+        if Path(pattern).is_absolute() or ".." in Path(pattern).parts or "\\" in pattern:
             raise BrownfieldError(f"Unsafe source glob: {pattern}")
         digest = hashlib.sha256()
-        matches = [path for path in repo_root.glob(pattern) if path.is_file() and MEMORY_NAME not in path.parts]
-        for path in sorted(matches):
-            digest.update(path.relative_to(repo_root).as_posix().encode())
+        for lexical in sorted(repo_root.glob(pattern), key=lambda item: item.as_posix()):
+            display = lexical.relative_to(repo_root).as_posix()
+            if _is_memory_path(display, repo_root, repo_root):
+                continue
+            target = _confined_regular_file(repo_root, lexical)
+            digest.update(display.encode())
             digest.update(b"\0")
-            digest.update(hash_file(path).encode())
+            digest.update(hash_file(target).encode())
             digest.update(b"\0")
         return digest.hexdigest()
     return None
 
 
-def stale_records(project_root: Path) -> dict[str, list[str]]:
+def stale_records(
+    project_root: Path,
+    *,
+    snapshot: dict[str, Any] | None = None,
+    records: dict[str, tuple[Path, dict[str, Any]]] | None = None,
+) -> dict[str, list[str]]:
     memory = memory_path(project_root)
     manifest = read_json(memory / "manifest.json")
-    snapshots = snapshot_vector(project_root, manifest)
+    snapshots = snapshot or snapshot_vector(project_root, manifest)
     snapshot_by_id = {item["repository_id"]: item for item in snapshots["repositories"]}
     roots = _repository_roots(project_root, manifest)
-    records = load_records(memory)
+    records = records or load_records(memory)
     stale: dict[str, list[str]] = {}
     now = datetime.now(UTC)
     for record_id, (_, record) in records.items():
@@ -1167,7 +1382,7 @@ def render_views(project_root: Path) -> dict[str, Path]:
     records = load_records(memory)
     digest = knowledge_digest(memory)
     snapshot = snapshot_vector(project_root, manifest)
-    stale = stale_records(project_root)
+    stale = stale_records(project_root, snapshot=snapshot, records=records)
     known_stale = known_stale_records(memory)
     entries = []
     for record_id, (path, record) in sorted(records.items()):
@@ -1280,22 +1495,49 @@ def build_context(
     memory = memory_path(project_root)
     state = read_json(memory / "state.json")
     records = load_records(memory)
-    selected: list[str] = []
+    requested: list[str] = []
+    inclusion_reasons: dict[str, str] = {}
     for record_id in record_ids:
         if record_id not in records:
             raise BrownfieldError(f"Unknown record ID: {record_id}")
-        if record_id not in selected:
-            selected.append(record_id)
+        if record_id not in requested:
+            requested.append(record_id)
+            inclusion_reasons[record_id] = "explicit record"
     if query:
         needle = query.casefold()
         for record_id, (_, record) in sorted(records.items()):
-            haystack = canonical_json({"title": record["title"], "statement": record["statement"], "scope": record["scope"], "details": record["details"]}).casefold()
-            if needle in haystack and record_id not in selected:
-                selected.append(record_id)
-    for record_id in list(selected):
-        for dependency in records[record_id][1].get("depends_on", {}).get("records", []):
-            if dependency in records and dependency not in selected:
-                selected.append(dependency)
+            haystack = canonical_json({
+                "title": record["title"], "statement": record["statement"],
+                "scope": record["scope"], "details": record["details"],
+            }).casefold()
+            if needle in haystack and record_id not in requested:
+                requested.append(record_id)
+                inclusion_reasons[record_id] = f"query match: {query}"
+
+    selected: list[str] = []
+    visiting: list[str] = []
+    visited: set[str] = set()
+    missing_dependencies: dict[str, list[str]] = {}
+
+    def visit(record_id: str) -> None:
+        if record_id in visited:
+            return
+        if record_id in visiting:
+            raise BrownfieldError("Context dependency cycle: " + " -> ".join(visiting + [record_id]))
+        visiting.append(record_id)
+        dependencies = records[record_id][1].get("depends_on", {}).get("records", [])
+        for dependency in dependencies:
+            if dependency not in records:
+                missing_dependencies.setdefault(record_id, []).append(dependency)
+                continue
+            inclusion_reasons.setdefault(dependency, f"dependency of {record_id}")
+            visit(dependency)
+        visiting.pop()
+        visited.add(record_id)
+        selected.append(record_id)
+
+    for record_id in requested:
+        visit(record_id)
 
     constitution = (memory / "constitution.md").read_text(encoding="utf-8")
     header = [
@@ -1315,9 +1557,22 @@ def build_context(
         "",
     ]
     output = "\n".join(header)
+    included: list[str] = []
     omitted: list[str] = []
+    omission_reasons: dict[str, str] = {}
     for record_id in selected:
         path, record = records[record_id]
+        dependencies = record.get("depends_on", {}).get("records", [])
+        unavailable = [item for item in dependencies if item not in included]
+        missing = missing_dependencies.get(record_id, [])
+        if missing:
+            omitted.append(record_id)
+            omission_reasons[record_id] = "missing dependencies: " + ", ".join(missing)
+            continue
+        if unavailable:
+            omitted.append(record_id)
+            omission_reasons[record_id] = "dependency omitted: " + ", ".join(unavailable)
+            continue
         section = (
             f"### {record['title']} (`{record_id}`)\n\n"
             f"Source: `{path.relative_to(memory).as_posix()}`\n\n"
@@ -1325,15 +1580,20 @@ def build_context(
         )
         if len(output) + len(section) > max_chars:
             omitted.append(record_id)
+            omission_reasons[record_id] = "character budget"
             continue
         output += section
+        included.append(record_id)
     manifest = [
-        "## Context manifest",
-        "",
-        f"Included record IDs: {', '.join(item for item in selected if item not in omitted) or 'none'}",
+        "## Context manifest", "",
+        f"Included record IDs: {', '.join(included) or 'none'}",
         f"Omitted record IDs: {', '.join(omitted) or 'none'}",
-        f"Character budget: {max_chars}",
-        "",
+        f"Dependency closure complete: {'yes' if not omitted and not missing_dependencies else 'no'}",
+        "Inclusion reasons:",
+        *[f"- {item}: {inclusion_reasons.get(item, 'dependency closure')}" for item in included],
+        "Omission reasons:",
+        *[f"- {item}: {omission_reasons[item]}" for item in omitted],
+        f"Character budget: {max_chars}", "",
     ]
     suffix = "\n".join(manifest)
     if len(output) + len(suffix) > max_chars:
@@ -1410,58 +1670,66 @@ def init_memory(project_root: Path, project_name: str, authority_branch: str | N
     if missing_schemas:
         raise BrownfieldError(f"Skill assets are missing schemas: {', '.join(sorted(missing_schemas))}")
 
+    final_memory = memory
+    memory = root / f"{MEMORY_NAME}.init-{uuid.uuid4().hex}"
     memory.mkdir()
-    manifest = {
-        "schema_version": SCHEMA_VERSION,
-        "minimum_writer_version": WRITER_VERSION,
-        "project_id": str(uuid.uuid4()),
-        "project_name": project_name,
-        "created_at": now,
-        "canonical_branch": branch,
-        "repositories": [{
-            "id": "primary",
-            "repository_uuid": str(uuid.uuid4()),
-            "path": ".",
-            "role": "COORDINATING",
-            "authority_branch": branch,
-            "remote_alias": remote,
-        }],
-        "native_authorities": [],
-        "schema_directory": "schemas",
-    }
-    state = {
-        "schema_version": SCHEMA_VERSION,
-        "memory_revision": 0,
-        "active_run_id": None,
-        "last_completed_run_id": None,
-        "last_snapshot": None,
-        "updated_at": now,
-    }
-    atomic_write_json(memory / "manifest.json", manifest)
-    atomic_write_json(memory / "policy.json", default_policy())
-    atomic_write_json(memory / "state.json", state)
-    atomic_write_text(memory / ".gitignore", "runtime/\ncache/\nruns/*/context/\n*.tmp\n")
-    for directory in [
-        "model/components", "model/capabilities", "model/flows", "model/data",
-        "model/testing", "model/infrastructure", *RECORD_DIRS.values(), "runs",
-        "generated", "runtime/locks", "runtime/transactions", "runtime/context", "runtime/artifacts",
-        "schemas",
-    ]:
-        safe_child(memory, directory).mkdir(parents=True, exist_ok=True)
+    try:
+        manifest = {
+            "schema_version": SCHEMA_VERSION,
+            "minimum_writer_version": WRITER_VERSION,
+            "project_id": str(uuid.uuid4()),
+            "project_name": project_name,
+            "created_at": now,
+            "canonical_branch": branch,
+            "repositories": [{
+                "id": "primary",
+                "repository_uuid": str(uuid.uuid4()),
+                "path": ".",
+                "role": "COORDINATING",
+                "authority_branch": branch,
+                "remote_alias": remote,
+            }],
+            "native_authorities": [],
+            "schema_directory": "schemas",
+        }
+        state = {
+            "schema_version": SCHEMA_VERSION,
+            "memory_revision": 0,
+            "active_run_id": None,
+            "last_completed_run_id": None,
+            "last_snapshot": None,
+            "updated_at": now,
+        }
+        atomic_write_json(memory / "manifest.json", manifest)
+        atomic_write_json(memory / "policy.json", default_policy())
+        atomic_write_json(memory / "state.json", state)
+        atomic_write_text(memory / ".gitignore", "runtime/\ncache/\nruns/*/context/\n*.tmp\n")
+        for directory in [
+            "model/components", "model/capabilities", "model/flows", "model/data",
+            "model/testing", "model/infrastructure", *RECORD_DIRS.values(), "runs",
+            "generated", "runtime/locks", "runtime/transactions", "runtime/context", "runtime/artifacts",
+            "schemas",
+        ]:
+            safe_child(memory, directory).mkdir(parents=True, exist_ok=True)
 
-    template_targets = {
-        "CONSTITUTION.md": memory / "constitution.md",
-        "OVERVIEW.md": memory / "model" / "overview.md",
-        "ARCHITECTURE.md": memory / "model" / "architecture.md",
-        "CAPABILITIES.md": memory / "model" / "capabilities.md",
-    }
-    for source_name, target in template_targets.items():
-        atomic_write_text(target, template_values[source_name])
-    for schema_name, value in schema_values.items():
-        atomic_write_json(memory / "schemas" / schema_name, value)
+        template_targets = {
+            "CONSTITUTION.md": memory / "constitution.md",
+            "OVERVIEW.md": memory / "model" / "overview.md",
+            "ARCHITECTURE.md": memory / "model" / "architecture.md",
+            "CAPABILITIES.md": memory / "model" / "capabilities.md",
+        }
+        for source_name, target in template_targets.items():
+            atomic_write_text(target, template_values[source_name])
+        for schema_name, value in schema_values.items():
+            atomic_write_json(memory / "schemas" / schema_name, value)
 
-    snapshot = snapshot_vector(root, manifest)
-    state["last_snapshot"] = snapshot
-    atomic_write_json(memory / "state.json", state)
-    render_views(root)
-    return memory
+        snapshot = snapshot_vector(root, manifest)
+        state["last_snapshot"] = snapshot
+        atomic_write_json(memory / "state.json", state)
+        os.replace(memory, final_memory)
+        memory = final_memory
+        render_views(root)
+        return memory
+    except Exception:
+        shutil.rmtree(memory, ignore_errors=True)
+        raise

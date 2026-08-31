@@ -1,4 +1,6 @@
 interface:
   display_name: "Decision Recon"
-  short_description: "Research and pressure-test engineering choices"
-  default_prompt: "Use $decision-recon to compare these engineering options and produce an evidence-backed, reversible recommendation."
+  short_description: "Research a reversible engineering decision"
+  default_prompt: "Use $decision-recon to compare these engineering options with hard gates, current evidence, sensitivity, and reversal conditions."
+policy:
+  allow_implicit_invocation: false

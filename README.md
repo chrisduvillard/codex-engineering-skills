@@ -38,6 +38,17 @@ Each skill is deliberately opinionated. Together they cover eleven recurring fai
 | Pressure-test an idea while changing direction is cheap | [`$idea-forge`](skills/idea-forge) | Attacks assumptions, defends the strongest version, and renders an honest outcome |
 | Keep repository agent instructions useful without letting context sprawl | [`$context-pruner`](skills/context-pruner) | Verifies loading, accounts for every rule, and prunes only with evidence |
 
+## Routing and composition
+
+Start with the narrowest workflow that owns the decision. See [`ROUTING.md`](ROUTING.md).
+
+```text
+idea-forge -> decision-recon -> deep-plan
+deep-plan -> implementation -> adversarial-review -> checkpoint-walkthrough
+completed work -> evidence-retrospective
+long-running system -> steward-brownfield throughout
+```
+
 ## The collection
 
 ### 01 · Deep Plan
@@ -174,27 +185,32 @@ Use $context-pruner to audit this repository’s agent instructions and remove c
 
 ## Installation
 
-Clone the collection:
+Install from a versioned release into the personal skills directory.
+
+**macOS or Linux**
 
 ```bash
-git clone https://github.com/chrisduvillard/codex-engineering-skills.git
-cd codex-engineering-skills
+git clone --branch v1.0.1 --depth 1 https://github.com/chrisduvillard/codex-engineering-skills.git
+mkdir -p "$HOME/.agents/skills"
+cp -R codex-engineering-skills/skills/* "$HOME/.agents/skills/"
+python -m pip install -r "$HOME/.agents/skills/steward-brownfield/requirements.txt"
 ```
 
-Then copy every skill into your personal Codex skills directory:
+**PowerShell**
 
-```bash
-mkdir -p ~/.codex/skills
-cp -R skills/* ~/.codex/skills/
+```powershell
+git clone --branch v1.0.1 --depth 1 https://github.com/chrisduvillard/codex-engineering-skills.git
+New-Item -ItemType Directory -Force "$HOME/.agents/skills" | Out-Null
+Copy-Item -Recurse -Force "codex-engineering-skills/skills/*" "$HOME/.agents/skills/"
+python -m pip install -r "$HOME/.agents/skills/steward-brownfield/requirements.txt"
 ```
 
-Or copy only the skill you want:
+For repository-scoped installation, copy only the required skill directories into
+`.agents/skills/` in that repository. Restart Codex after installation and invoke explicit-only
+workflows with their `$name`.
 
-```bash
-cp -R skills/adversarial-review ~/.codex/skills/
-```
-
-Restart Codex after installation, then invoke a skill explicitly with its `$name`.
+Upgrade by replacing a skill directory from a newer release. Uninstall by removing only that skill's
+directory.
 
 ## A shared operating philosophy
 
@@ -248,6 +264,7 @@ Run the same checks locally:
 ```bash
 python3 -m pip install -r requirements-dev.txt
 python3 scripts/validate_skills.py
+python3 scripts/validate_catalog.py
 python3 -m unittest discover -s tests -p 'test_*.py'
 python3 -m unittest discover -s skills/steward-brownfield/tests -p 'test_*.py'
 ```
